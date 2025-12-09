@@ -1,6 +1,6 @@
 package com.example.alpha_chat_native.data.repository
 
-import com.example.alphachat.data.models.Message
+import com.example.alpha_chat_native.data.models.Message
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore

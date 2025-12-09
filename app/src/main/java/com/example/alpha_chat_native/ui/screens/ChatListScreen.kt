@@ -1,9 +1,11 @@
 package com.example.alpha_chat_native.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -53,7 +55,7 @@ fun MessageRow(msg: Message) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(text = msg.text)
             msg.timestamp?.let { ts ->
-                Text(text = ts.toDate().toString(), style = MaterialTheme.typography.caption)
+                Text(text = ts.toDate().toString(), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

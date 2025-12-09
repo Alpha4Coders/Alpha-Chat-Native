@@ -30,7 +30,6 @@ class ChatViewModel @Inject constructor(
             try {
                 repo.signInAnonymously()
             } catch (e: Exception) {
-                // handle/log
             }
         }
     }
