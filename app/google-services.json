@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1092892580622",
+    "project_id": "alpha-chat-native",
+    "storage_bucket": "alpha-chat-native.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1092892580622:android:6f5b7c9a07a90a83de155f",
+        "android_client_info": {
+          "package_name": "com.example.alpha_chat_native"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkQEqaquA1TxU_w6j-R3bZe_l8NZ4Ats0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

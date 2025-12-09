@@ -3,14 +3,18 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
+    // Use the alias here to ensure it matches the root version
+    alias(libs.plugins.hilt.android)
     id("com.google.gms.google-services")
 }
-
 
 android {
     namespace = "com.example.alpha_chat_native"
     compileSdk = 36
+
+    kapt {
+        correctErrorTypes = true
+    }
 
     defaultConfig {
         applicationId = "com.example.alpha_chat_native"
@@ -31,6 +35,7 @@ android {
         }
     }
     compileOptions {
+        // Hilt 2.51+ usually prefers Java 17, but 11 is acceptable for source compatibility
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -43,7 +48,7 @@ android {
 }
 
 dependencies {
-
+    // --- Android X & Compose (Using libs) ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -52,6 +57,46 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // Note: You had duplicate Compose dependencies hardcoded.
+    // I have removed the duplicates and kept the 'libs' versions.
+
+    // --- Hilt (UPDATED: Using libs variables to match 2.51.1) ---
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // --- Firebase ---
+    implementation("com.google.firebase:firebase-auth-ktx:22.1.0")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
+
+    // --- Coroutines ---
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // --- Lifecycle & ViewModel ---
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+
+    // --- Navigation ---
+    implementation("androidx.navigation:navigation-compose:2.8.0")
+    // Note: Updated to 2.8.0+ for better compatibility with Compose 2024.x
+
+    // --- Logging ---
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
+    // --- Coil ---
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // --- Serialization ---
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // --- Networking ---
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+
+    // --- Testing ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -59,50 +104,4 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.00")
-    implementation(composeBom)
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material:material")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation("androidx.navigation:navigation-compose:2.7.0")
-
-
-
-    // Hilt
-    implementation("com.google.dagger:hilt-android:2.46.1")
-    kapt ("com.google.dagger:hilt-compiler:2.56.2")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-
-    // Firebase
-    implementation("com.google.firebase:firebase-auth-ktx:22.1.0")
-    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Lifecycle & ViewModel
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
-
-    // Logging
-    implementation("com.jakewharton.timber:timber:5.0.1")
-
-    // Coil for avatars (optional)
-    implementation("io.coil-kt:coil-compose:2.4.0")
-
-    //Jetpack Compose Integration
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
-    implementation("androidx.navigation:navigation-compose-android:2.9.0")
-
-
-    // Networking (optional; useful for ChatGPT backend)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
 }
