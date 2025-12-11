@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     id("kotlin-kapt")
     // Use the alias here to ensure it matches the root version
     alias(libs.plugins.hilt.android)
@@ -58,9 +59,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
-    // Note: You had duplicate Compose dependencies hardcoded.
-    // I have removed the duplicates and kept the 'libs' versions.
-
     // --- Hilt (UPDATED: Using libs variables to match 2.51.1) ---
     implementation(libs.hilt.android)
 
@@ -80,7 +78,6 @@ dependencies {
 
     // --- Navigation ---
     implementation("androidx.navigation:navigation-compose:2.8.0")
-    // Note: Updated to 2.8.0+ for better compatibility with Compose 2024.x
 
     // --- Logging ---
     implementation("com.jakewharton.timber:timber:5.0.1")
@@ -105,4 +102,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    implementation("androidx.compose.material:material-icons-extended")
 }
