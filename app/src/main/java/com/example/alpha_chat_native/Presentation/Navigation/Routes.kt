@@ -18,4 +18,10 @@ sealed class Routes {
     data object CommunityScreen:Routes()
     @Serializable
     data object CallScreen:Routes()
+    @Serializable
+    data object LOGIN:Routes()
+    @Serializable
+    data object CHAT:Routes()
+    @Serializable
+    data object CHAT_LIST:Routes()
 }
