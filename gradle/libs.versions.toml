@@ -10,10 +10,6 @@ activityCompose = "1.11.0"
 composeBom = "2024.09.00"
 hiltNavigationCompose = "1.2.0"
 hilt = "2.51.1"
-<<<<<<< HEAD
-coreSplashscreen = "1.2.0"
-=======
->>>>>>> 55278f5754369dcf154690cfda869abf00a50aa4
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,10 +30,6 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
-<<<<<<< HEAD
-androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
-=======
->>>>>>> 55278f5754369dcf154690cfda869abf00a50aa4
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

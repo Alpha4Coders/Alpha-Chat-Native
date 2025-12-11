@@ -3,10 +3,7 @@ package com.example.alpha_chat_native
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-<<<<<<< HEAD
 import androidx.activity.enableEdgeToEdge
-=======
->>>>>>> 55278f5754369dcf154690cfda869abf00a50aa4
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint

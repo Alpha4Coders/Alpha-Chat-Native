@@ -63,10 +63,7 @@ dependencies {
 
     // --- Hilt (UPDATED: Using libs variables to match 2.51.1) ---
     implementation(libs.hilt.android)
-<<<<<<< HEAD
-    implementation(libs.androidx.core.splashscreen)
-=======
->>>>>>> 55278f5754369dcf154690cfda869abf00a50aa4
+
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

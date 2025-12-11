@@ -1,9 +1,9 @@
 package com.example.alpha_chat_native.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.Button
-import androidx.compose.material.Text
-import androidx.compose.material.TextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +35,8 @@ fun LoginScreen(
         Spacer(Modifier.height(12.dp))
         Button(onClick = onLogin) {
             Text("Enter")
+
+
         }
     }
 }
