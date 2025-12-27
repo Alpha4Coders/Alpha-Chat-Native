@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     id("kotlin-kapt")
-    // Use the alias here to ensure it matches the root version
     alias(libs.plugins.hilt.android)
     id("com.google.gms.google-services")
 }
@@ -36,7 +35,6 @@ android {
         }
     }
     compileOptions {
-        // Hilt 2.51+ usually prefers Java 17, but 11 is acceptable for source compatibility
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -49,6 +47,8 @@ android {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+
     // --- Android X & Compose (Using libs) ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -65,9 +65,10 @@ dependencies {
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
-    // --- Firebase ---
-    implementation("com.google.firebase:firebase-auth-ktx:22.1.0")
-    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
+    // --- Firebase (Now using BOM) ---
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-storage-ktx")
 
     // --- Coroutines ---
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

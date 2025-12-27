@@ -11,6 +11,7 @@ import com.example.alpha_chat_native.ui.theme.AlphaChatNativeTheme
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.example.alpha_chat_native.Presentation.Navigation.Routes
 import com.example.alpha_chat_native.ui.screens.*
 
@@ -75,13 +76,36 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<Routes.HomeScreen> {
                             HomeScreen(
-                                onChatClick = {
-                                    nav.navigate(Routes.CHAT)
+                                onChatClick = { chatId ->
+                                    nav.navigate(Routes.CHAT(chatId))
+                                },
+                                onNavigateToProfile = {
+                                    nav.navigate(Routes.ProfileScreen)
                                 }
                             )
                         }
-                        composable<Routes.CHAT> {
-                            ChatScreen()
+                        composable<Routes.CHAT> { backStackEntry ->
+                            val chatRoute: Routes.CHAT = backStackEntry.toRoute()
+                            ChatScreen(
+                                chatId = chatRoute.chatId,
+                                onBack = {
+                                    nav.popBackStack()
+                                }
+                            )
+                        }
+                        composable<Routes.ProfileScreen> {
+                            ProfileScreen(
+                                onNavigateHome = {
+                                    nav.navigate(Routes.HomeScreen) {
+                                        popUpTo(Routes.ProfileScreen) { inclusive = true }
+                                    }
+                                },
+                                onNavigateToLogin = {
+                                    nav.navigate(Routes.LOGIN) {
+                                        popUpTo(Routes.HomeScreen) { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                     }
                 }

@@ -37,6 +37,23 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun resetPassword(email: String) {
+        if (email.isBlank()) {
+            _loginState.value = LoginState.Error("Please enter your email to reset password")
+            return
+        }
+
+        viewModelScope.launch {
+            _loginState.value = LoginState.Loading
+            try {
+                auth.sendPasswordResetEmail(email).await()
+                _loginState.value = LoginState.PasswordResetEmailSent
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error(e.message ?: "Failed to send reset email")
+            }
+        }
+    }
+
     // Reset state after navigation or error dismissal
     fun resetState() {
         _loginState.value = LoginState.Idle
@@ -48,5 +65,6 @@ sealed class LoginState {
     object Idle : LoginState()
     object Loading : LoginState()
     object Success : LoginState()
+    object PasswordResetEmailSent : LoginState()
     data class Error(val message: String) : LoginState()
 }

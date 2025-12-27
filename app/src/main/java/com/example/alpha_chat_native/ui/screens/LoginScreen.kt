@@ -33,7 +33,8 @@ private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
 
 // Define Particle Data Class (Must be public or internal to be visible inside Composable)
-data class Particle(
+// Renamed to avoid redeclaration conflict with other files
+private data class LoginParticle(
     val x: Float,
     val y: Float,
     val size: Float,
@@ -60,6 +61,10 @@ fun LoginScreen(
         when (val state = loginState) {
             is LoginState.Success -> {
                 onLoginSuccess()
+                viewModel.resetState()
+            }
+            is LoginState.PasswordResetEmailSent -> {
+                Toast.makeText(context, "Password reset email sent to $email", Toast.LENGTH_LONG).show()
                 viewModel.resetState()
             }
             is LoginState.Error -> {
@@ -99,7 +104,7 @@ fun LoginScreen(
                 ) {
 
                     Text(
-                        text = "Alpha Chats 💬",
+                        text = "Alpha Chat 💬",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.Magenta // Use brand color
@@ -147,6 +152,20 @@ fun LoginScreen(
                         ),
                         enabled = loginState !is LoginState.Loading
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Forgot Password
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = SplashPrimary,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.clickable {
+                                viewModel.resetPassword(email)
+                            }
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -199,7 +218,7 @@ fun LoginScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Don’t have an account?" ,color = Color.White)
+                        Text("Don’t have an account?", color = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Sign up",
@@ -245,7 +264,7 @@ fun DynamicParticleBackground() {
     // Particles Setup
     val particles = remember {
         List(20) {
-            Particle(
+            LoginParticle(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
                 size = Random.nextFloat() * 6 + 2,

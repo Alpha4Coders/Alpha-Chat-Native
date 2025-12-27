@@ -5,10 +5,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,7 +27,7 @@ import com.example.alpha_chat_native.vm.ChatViewModel
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-// ChainTorque Brand Colors
+// --- Theme Colors (Matched with Login/Registration) ---
 private val SplashBackground = Color(0xFF012106)
 private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
@@ -38,70 +39,17 @@ fun SplashScreen(
 ) {
     var startAnimation by remember { mutableStateOf(false) }
 
+    // Animations
     val logoScale by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0.5f,
         animationSpec = tween(durationMillis = 800, easing = EaseOutBack),
         label = "logoScale"
     )
 
-    val logoAlpha by animateFloatAsState(
+    val contentAlpha by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 600),
-        label = "logoAlpha"
-    )
-
-    val textAlpha by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 800, delayMillis = 400),
-        label = "textAlpha"
-    )
-
-    val subtitleAlpha by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 600, delayMillis = 700),
-        label = "subtitleAlpha"
-    )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha"
-    )
-
-    val particles = remember {
-        List(20) {
-            Particle(
-                x = Random.nextFloat(),
-                y = Random.nextFloat(),
-                size = Random.nextFloat() * 6 + 2,
-                speed = Random.nextFloat() * 0.005f + 0.002f,
-                alpha = Random.nextFloat() * 0.5f + 0.2f
-            )
-        }
-    }
-
-    val particleProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "particleProgress"
+        animationSpec = tween(durationMillis = 800),
+        label = "contentAlpha"
     )
 
     LaunchedEffect(Unit) {
@@ -124,34 +72,160 @@ fun SplashScreen(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            particles.forEach { particle ->
-                val animatedY = (particle.y + particleProgress * particle.speed * 100) % 1f
-                drawCircle(
-                    color = SplashPrimary.copy(alpha = particle.alpha),
-                    radius = particle.size.dp.toPx(),
-                    center = Offset(
-                        x = particle.x * size.width,
-                        y = animatedY * size.height
+        // Shared Particle Background Logic
+        SplashParticleBackground()
+
+        // Glass Card Container
+        Card(
+            modifier = Modifier
+                .padding(24.dp)
+                .wrapContentSize()
+                .alpha(contentAlpha)
+                .scale(logoScale),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Black.copy(alpha = 0.50f) // Semi-transparent glass
+            ),
+            elevation = CardDefaults.cardElevation(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Logo Container
+                Box(
+                    modifier = Modifier.size(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Glow behind logo
+                    Canvas(modifier = Modifier.size(140.dp)) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    SplashPrimary.copy(alpha = 0.5f),
+                                    Color.Transparent
+                                )
+                            ),
+                            radius = 70.dp.toPx()
+                        )
+                    }
+
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "Logo",
+                        modifier = Modifier.fillMaxSize()
                     )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Text(
+                    text = "Alpha Chats",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Secure. Fast. Native.",
+                    fontSize = 16.sp,
+                    color = SplashPrimary,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                LoadingDots(
+                    color = SplashPrimary
                 )
             }
         }
+    }
+}
 
+@Composable
+private fun SplashParticleBackground() {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+
+    // Pulse Animation
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulseScale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulseAlpha"
+    )
+
+    // Particles Setup
+    val particles = remember {
+        List(25) {
+            SplashParticle(
+                x = Random.nextFloat(),
+                y = Random.nextFloat(),
+                size = Random.nextFloat() * 6 + 2,
+                speed = Random.nextFloat() * 0.005f + 0.002f,
+                alpha = Random.nextFloat() * 0.5f + 0.2f
+            )
+        }
+    }
+
+    val particleProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particleProgress"
+    )
+
+    // Draw Particles
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        particles.forEach { particle ->
+            val animatedY = (particle.y + particleProgress * particle.speed * 100) % 1f
+            drawCircle(
+                color = SplashPrimary.copy(alpha = particle.alpha),
+                radius = particle.size.dp.toPx(),
+                center = Offset(
+                    x = particle.x * size.width,
+                    y = animatedY * size.height
+                )
+            )
+        }
+    }
+
+    // Draw Pulsing Circles (Background Decor)
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Canvas(
             modifier = Modifier
-                .size(200.dp)
+                .size(300.dp)
                 .scale(pulseScale)
                 .alpha(pulseAlpha)
         ) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(SplashPrimary, Color.Transparent)
+                    colors = listOf(SplashPrimary.copy(alpha=0.3f), Color.Transparent)
                 ),
                 radius = size.minDimension / 2
             )
         }
-
+        
         val pulseScale2 by infiniteTransition.animateFloat(
             initialValue = 1f,
             targetValue = 1.8f,
@@ -173,73 +247,22 @@ fun SplashScreen(
 
         Canvas(
             modifier = Modifier
-                .size(200.dp)
+                .size(300.dp)
                 .scale(pulseScale2)
                 .alpha(pulseAlpha2)
         ) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(SplashSecondary, Color.Transparent)
+                    colors = listOf(SplashSecondary.copy(alpha=0.3f), Color.Transparent)
                 ),
                 radius = size.minDimension / 2
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .scale(logoScale)
-                    .alpha(logoAlpha),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(modifier = Modifier.size(140.dp)) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                SplashPrimary.copy(alpha = 0.3f),
-                                Color.Transparent
-                            )
-                        ),
-                        radius = 70.dp.toPx()
-                    )
-                }
-
-                Image(
-
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize()
-
-                    )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "Alpha Chats",
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.alpha(textAlpha)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            LoadingDots(
-                modifier = Modifier.alpha(subtitleAlpha)
             )
         }
     }
 }
 
 @Composable
-private fun LoadingDots(modifier: Modifier = Modifier) {
+private fun LoadingDots(color: Color, modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "dots")
 
     Row(
@@ -260,18 +283,15 @@ private fun LoadingDots(modifier: Modifier = Modifier) {
 
             Canvas(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(10.dp)
                     .alpha(dotAlpha)
             ) {
-                drawCircle(color = SplashPrimary)
+                drawCircle(color = color)
             }
         }
     }
 }
 
-// Remove the data class declaration here to avoid redeclaration conflict
-// It is already defined in LoginScreen.kt or should be moved to a shared file.
-// For now, I will rename it to SplashParticle to avoid conflict if I cannot delete the other one easily.
 private data class SplashParticle(
     val x: Float,
     val y: Float,
