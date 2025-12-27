@@ -20,9 +20,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.alpha_chat_native.R
+import com.example.alpha_chat_native.vm.ChatViewModel
 import kotlinx.coroutines.delay
 import kotlin.random.Random
-import com.example.alpha_chat_native.R
 
 // ChainTorque Brand Colors
 private val SplashBackground = Color(0xFF012106)
@@ -31,7 +33,8 @@ private val SplashSecondary = Color(0xFF04450F)
 
 @Composable
 fun SplashScreen(
-    onNavigateToNext: () -> Unit
+    onNavigateToNext: (Boolean) -> Unit,
+    vm: ChatViewModel = hiltViewModel()
 ) {
     var startAnimation by remember { mutableStateOf(false) }
 
@@ -104,7 +107,7 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         startAnimation = true
         delay(2500)
-        onNavigateToNext()
+        onNavigateToNext(vm.isLoggedIn())
     }
 
     Box(
@@ -264,7 +267,10 @@ private fun LoadingDots(modifier: Modifier = Modifier) {
     }
 }
 
-private data class Particle(
+// Remove the data class declaration here to avoid redeclaration conflict
+// It is already defined in LoginScreen.kt or should be moved to a shared file.
+// For now, I will rename it to SplashParticle to avoid conflict if I cannot delete the other one easily.
+private data class SplashParticle(
     val x: Float,
     val y: Float,
     val size: Float,

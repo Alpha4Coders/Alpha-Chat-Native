@@ -26,10 +26,15 @@ class MainActivity : ComponentActivity() {
                     NavHost(navController = nav, startDestination = Routes.SplashScreen) {
                         composable<Routes.SplashScreen> {
                             SplashScreen(
-                                onNavigateToNext = {
-                                    // TODO: Check if user is logged in
-                                    nav.navigate(Routes.WelcomeScreen) {
-                                        popUpTo(Routes.SplashScreen) { inclusive = true }
+                                onNavigateToNext = { isLoggedIn ->
+                                    if (isLoggedIn) {
+                                        nav.navigate(Routes.HomeScreen) {
+                                            popUpTo(Routes.SplashScreen) { inclusive = true }
+                                        }
+                                    } else {
+                                        nav.navigate(Routes.WelcomeScreen) {
+                                            popUpTo(Routes.SplashScreen) { inclusive = true }
+                                        }
                                     }
                                 }
                             )
@@ -57,11 +62,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable<Routes.LOGIN> {
-                            LoginScreen(onLogin = {
-                                nav.navigate(Routes.HomeScreen) {
-                                    popUpTo(Routes.LOGIN) { inclusive = true }
+                            LoginScreen(
+                                onLoginSuccess = {
+                                    nav.navigate(Routes.HomeScreen) {
+                                        popUpTo(Routes.LOGIN) { inclusive = true }
+                                    }
+                                },
+                                onSignUpClick = {
+                                    nav.navigate(Routes.UserRegistrationScreen)
                                 }
-                            })
+                            )
                         }
                         composable<Routes.HomeScreen> {
                             HomeScreen(
