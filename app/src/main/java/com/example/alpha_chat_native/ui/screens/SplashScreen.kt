@@ -209,16 +209,18 @@ fun SplashScreen(
                 }
 
                 Image(
+
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize()
-                )
+
+                    )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "Alpha Chat",
+                text = "Alpha Chats",
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,

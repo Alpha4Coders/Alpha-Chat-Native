@@ -89,7 +89,7 @@ fun LoginScreen(
                 shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(
                     // Slightly more transparent white to let the dark background show through gently
-                    containerColor = Color.White.copy(alpha = 0.90f)
+                    containerColor = Color.Black.copy(alpha = 0.90f)
                 ),
                 elevation = CardDefaults.cardElevation(12.dp)
             ) {
@@ -99,10 +99,10 @@ fun LoginScreen(
                 ) {
 
                     Text(
-                        text = "Alpha Chat 💬",
+                        text = "Alpha Chats 💬",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
-                        color = SplashPrimary // Use brand color
+                        color = Color.Magenta // Use brand color
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -110,7 +110,7 @@ fun LoginScreen(
                     Text(
                         text = "Chat. Connect. Chill.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        color = Color.Green
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -185,7 +185,7 @@ fun LoginScreen(
                             } else {
                                 Text(
                                     text = "Sign In",
-                                    color = Color.White,
+                                    color = Color.Black,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -199,7 +199,7 @@ fun LoginScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Don’t have an account?")
+                        Text("Don’t have an account?" ,color = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Sign up",
