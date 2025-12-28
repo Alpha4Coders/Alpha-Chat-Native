@@ -21,9 +21,9 @@ sealed class Routes {
     @Serializable
     data object LOGIN:Routes()
     @Serializable
-    data class CHAT(val chatId: String):Routes() // Updated to carry chatId
+    data class CHAT(val chatId: String):Routes()
     @Serializable
-    data object CHAT_LIST:Routes()
+    data object SelectUserScreen:Routes() // For starting a new chat
     @Serializable
     data object ProfileScreen:Routes()
 }

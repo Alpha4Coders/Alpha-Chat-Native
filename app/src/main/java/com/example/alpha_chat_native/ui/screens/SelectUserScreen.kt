@@ -2,19 +2,29 @@ package com.example.alpha_chat_native.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,59 +38,32 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberAsyncImagePainter
-import com.example.alpha_chat_native.data.models.Conversation
+import com.example.alpha_chat_native.data.models.User
 import com.example.alpha_chat_native.vm.ChatViewModel
-import java.text.SimpleDateFormat
-import java.util.Locale
-
-// --- Theme Colors ---
-private val SplashPrimary = Color(0xFF07AD52)
-private val NeonGreen = Color(0xFF39FF14)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatListScreen(
-    onNewChatClick: () -> Unit,
-    onConversationClick: (String) -> Unit, 
+fun SelectUserScreen(
+    onUserSelected: (String) -> Unit,
     vm: ChatViewModel = hiltViewModel()
 ) {
-    val conversations by vm.conversations.collectAsState()
-
-    val textColor = Color.White
-    val accentColor = SplashPrimary
+    val users by vm.users.collectAsState()
+    val currentUserId = vm.currentUserId
 
     Scaffold(
-        containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text("Chats", fontWeight = FontWeight.Bold, color = textColor) },
-                actions = {
-                    IconButton(onClick = {}) { Icon(Icons.Default.Search, contentDescription = "Search", tint = textColor) }
-                    IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More", tint = textColor) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNewChatClick,
-                containerColor = accentColor,
-                contentColor = Color(0xFF012106)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "New Chat")
-            }
+            TopAppBar(title = { Text("Select a User to Chat With") })
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            items(conversations) { conversation ->
-                ConversationItem(conversation = conversation) {
-                    onConversationClick(conversation.id)
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            items(users.filter { it.uid != currentUserId }) { user ->
+                val chatId = if (currentUserId != null) {
+                    if (currentUserId < user.uid) "${currentUserId}_${user.uid}" else "${user.uid}_${currentUserId}"
+                } else {
+                    user.uid // Fallback, should not happen in practice
+                }
+                UserItem(user = user) {
+                    onUserSelected(chatId)
                 }
             }
         }
@@ -88,15 +71,14 @@ fun ChatListScreen(
 }
 
 @Composable
-fun ConversationItem(
-    conversation: Conversation,
+fun UserItem(
+    user: User,
     onClick: () -> Unit
 ) {
-    val user = conversation.otherUser ?: return
-
     val cardBgColor = Color(0xFF020E2A).copy(alpha = 0.5f)
     val textColor = Color.White
-    val secondaryTextColor = Color.White.copy(alpha=0.7f)
+    val secondaryTextColor = Color.White.copy(alpha = 0.7f)
+    val splashPrimary = Color(0xFF07AD52)
 
     Card(
         modifier = Modifier
@@ -119,11 +101,11 @@ fun ConversationItem(
                 modifier = Modifier
                     .size(50.dp)
                     .clip(CircleShape)
-                    .border(BorderStroke(1.dp, SplashPrimary.copy(alpha = 0.5f)), CircleShape)
+                    .border(BorderStroke(1.dp, splashPrimary.copy(alpha = 0.5f)), CircleShape)
             ) {
                 Image(
                     painter = rememberAsyncImagePainter(model = imageModel),
-                    contentDescription = null,
+                    contentDescription = "User Avatar",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -142,22 +124,11 @@ fun ConversationItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = conversation.lastMessage,
+                    text = user.email,
                     style = MaterialTheme.typography.bodyMedium,
                     color = secondaryTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            conversation.lastMessageTimestamp?.toDate()?.let {
-                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                Text(
-                    text = sdf.format(it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = secondaryTextColor
                 )
             }
         }

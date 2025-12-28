@@ -170,8 +170,7 @@ fun ChatScreen(
                     contentPadding = PaddingValues(8.dp),
                     verticalArrangement = Arrangement.Bottom,
                     reverseLayout = true
-                ) {
-                    items(messages.reversed()) { msg ->
+                ) {                    items(messages.reversed()) { msg ->
                         val isMe = msg.fromId == currentUserId
                         
                         MessageBubble(
@@ -231,7 +230,7 @@ fun MessageBubble(
                 message.timestamp?.let { ts ->
                     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                     Text(
-                        text = sdf.format(ts.toDate()),
+                        text = sdf.format(ts),
                         fontSize = 10.sp,
                         color = textColor.copy(alpha = 0.7f),
                         modifier = Modifier.align(Alignment.End)
@@ -281,7 +280,7 @@ fun ChatInputArea(
         
         FloatingActionButton(
             onClick = {
-                if (text.isNotBlank()) {
+                if (text.isNotBlank() && targetUserId != null) {
                     vm.send(text, toId = targetUserId)
                     text = ""
                 }

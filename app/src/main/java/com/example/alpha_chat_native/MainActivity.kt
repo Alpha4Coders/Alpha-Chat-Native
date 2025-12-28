@@ -76,11 +76,23 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<Routes.HomeScreen> {
                             HomeScreen(
-                                onChatClick = { chatId ->
+                                onConversationClick = { chatId ->
                                     nav.navigate(Routes.CHAT(chatId))
+                                },
+                                onNewChatClick = {
+                                    nav.navigate(Routes.SelectUserScreen)
                                 },
                                 onNavigateToProfile = {
                                     nav.navigate(Routes.ProfileScreen)
+                                }
+                            )
+                        }
+                        composable<Routes.SelectUserScreen> {
+                            SelectUserScreen(
+                                onUserSelected = { chatId ->
+                                    nav.navigate(Routes.CHAT(chatId)) {
+                                        popUpTo(Routes.SelectUserScreen) { inclusive = true }
+                                    }
                                 }
                             )
                         }

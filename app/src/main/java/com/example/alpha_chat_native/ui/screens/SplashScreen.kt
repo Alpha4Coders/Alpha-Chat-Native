@@ -34,7 +34,7 @@ private val SplashSecondary = Color(0xFF04450F)
 
 @Composable
 fun SplashScreen(
-    onNavigateToNext: (Boolean) -> Unit,
+    onNavigateToNext: (isLoggedIn: Boolean) -> Unit,
     vm: ChatViewModel = hiltViewModel()
 ) {
     var startAnimation by remember { mutableStateOf(false) }
@@ -52,10 +52,11 @@ fun SplashScreen(
         label = "contentAlpha"
     )
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(key1 = true) {
         startAnimation = true
-        delay(2500)
-        onNavigateToNext(vm.isLoggedIn())
+        delay(2000) // Show splash for 2 seconds
+        val isLoggedIn = vm.isLoggedIn()
+        onNavigateToNext(isLoggedIn)
     }
 
     Box(
@@ -122,7 +123,7 @@ fun SplashScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Text(
-                    text = "Alpha Chats",
+                    text = "Alpha Chat",
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,

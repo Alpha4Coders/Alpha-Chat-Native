@@ -3,7 +3,6 @@ package com.example.alpha_chat_native.ui.screens
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -16,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlin.random.Random
 
@@ -27,7 +25,8 @@ private val SplashSecondary = Color(0xFF04450F)
 
 @Composable
 fun HomeScreen(
-    onChatClick: (String) -> Unit,
+    onConversationClick: (String) -> Unit,
+    onNewChatClick: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
@@ -134,7 +133,10 @@ fun HomeScreen(
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
                 when (selectedIndex) {
-                    0 -> ChatListScreen(onChatClick = onChatClick)
+                    0 -> ChatListScreen(
+                        onConversationClick = onConversationClick,
+                        onNewChatClick = onNewChatClick
+                    )
                     1 -> UpdateScreen()
                     2 -> CommunityScreen()
                     3 -> CallScreen()

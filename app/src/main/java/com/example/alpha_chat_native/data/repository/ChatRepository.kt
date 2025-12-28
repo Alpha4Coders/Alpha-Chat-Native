@@ -1,6 +1,7 @@
 package com.example.alpha_chat_native.data.repository
 
 import android.net.Uri
+import com.example.alpha_chat_native.data.models.Conversation
 import com.example.alpha_chat_native.data.models.Message
 import com.example.alpha_chat_native.data.models.User
 import com.google.firebase.auth.FirebaseAuth
@@ -10,7 +11,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -26,28 +29,44 @@ class ChatRepository @Inject constructor(
 ) {
     private val messagesRef = firestore.collection("messages")
     private val usersRef = firestore.collection("users")
+    private val conversationsRef = firestore.collection("conversations")
     private val storageRef = storage.reference
 
-    suspend fun sendMessage(text: String, toId: String? = null) {
-        val uid = auth.currentUser?.uid ?: return
-        
-        val chatId = if (toId == null) {
-            "global"
-        } else {
-            if (uid < toId) "${uid}_$toId" else "${toId}_$uid"
+    private suspend fun getCurrentUserIdEnsuringAuth(): String {
+        var currentUser = auth.currentUser
+        if (currentUser == null) {
+            auth.signInAnonymously().await()
+            currentUser = auth.currentUser!!
         }
-
-        val map = mapOf(
-            "text" to text,
-            "fromId" to uid,
-            "toId" to toId,
-            "chatId" to chatId,
-            "timestamp" to FieldValue.serverTimestamp()
-        )
-        messagesRef.add(map).await()
+        return currentUser.uid
     }
 
-    fun observeMessages(chatId: String = "global"): Flow<List<Message>> = callbackFlow {
+    suspend fun sendMessage(text: String, toId: String) {
+        val fromId = getCurrentUserIdEnsuringAuth()
+        val chatId = if (fromId < toId) "${fromId}_$toId" else "${toId}_$fromId"
+
+        val message = Message(
+            text = text,
+            fromId = fromId,
+            toId = toId,
+            chatId = chatId,
+            timestamp = FieldValue.serverTimestamp()
+        )
+
+        coroutineScope {
+            async { messagesRef.add(message).await() }
+            async { 
+                val conversationUpdate = mapOf(
+                    "lastMessage" to text,
+                    "lastMessageTimestamp" to FieldValue.serverTimestamp(),
+                    "participantIds" to listOf(fromId, toId)
+                )
+                conversationsRef.document(chatId).set(conversationUpdate, SetOptions.merge()).await()
+            }
+        }
+    }
+
+    fun observeMessages(chatId: String): Flow<List<Message>> = callbackFlow {
         val subscription = messagesRef
             .whereEqualTo("chatId", chatId)
             .orderBy("timestamp", Query.Direction.ASCENDING)
@@ -76,12 +95,27 @@ class ChatRepository @Inject constructor(
         awaitClose { subscription.remove() }
     }
 
-    suspend fun signInAnonymously() {
-        auth.signInAnonymously().await()
-    }
-
-    suspend fun signInWithEmail(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password).await()
+    fun observeConversations(): Flow<List<Conversation>> = callbackFlow {
+        val fromId = auth.currentUser?.uid ?: return@callbackFlow
+        val subscription = conversationsRef
+            .whereArrayContains("participantIds", fromId)
+            .orderBy("lastMessageTimestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, ex ->
+                if (ex != null) {
+                    return@addSnapshotListener
+                }
+                val convos = snap?.documents?.mapNotNull {
+                    val conversation = it.toObject(Conversation::class.java)?.copy(id = it.id)
+                    conversation?.let { convo ->
+                        val otherId = convo.participantIds.firstOrNull { id -> id != fromId }
+                        // You would fetch user details here and attach to the conversation object
+                        // For now, we will do this in the ViewModel
+                    }
+                    conversation
+                } ?: emptyList()
+                trySend(convos)
+            }
+        awaitClose { subscription.remove() }
     }
 
     suspend fun createAccount(email: String, password: String) {
@@ -95,6 +129,10 @@ class ChatRepository @Inject constructor(
             )
             usersRef.document(user.uid).set(userMap, SetOptions.merge()).await()
         }
+    }
+    
+    suspend fun signInWithEmail(email: String, password: String) {
+        auth.signInWithEmailAndPassword(email, password).await()
     }
 
     fun currentUserId(): String? = auth.currentUser?.uid

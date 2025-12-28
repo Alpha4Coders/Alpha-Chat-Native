@@ -3,6 +3,7 @@ package com.example.alpha_chat_native.vm
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.alpha_chat_native.data.models.Conversation
 import com.example.alpha_chat_native.data.models.Message
 import com.example.alpha_chat_native.data.models.User
 import com.example.alpha_chat_native.data.repository.ChatRepository
@@ -10,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,6 +30,16 @@ class ChatViewModel @Inject constructor(
     val users = repo.observeUsers()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Combine conversations with users to populate the 'otherUser' field
+    val conversations = combine(repo.observeConversations(), users) { convos, allUsers ->
+        val currentUid = repo.currentUserId()
+        convos.map { convo ->
+            val otherId = convo.participantIds.firstOrNull { it != currentUid }
+            val otherUser = allUsers.find { it.uid == otherId }
+            convo.copy(otherUser = otherUser)
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
@@ -38,6 +50,7 @@ class ChatViewModel @Inject constructor(
         get() = repo.currentUserId()
     
     init {
+        // Initial load of global chat or last chat
         loadMessages("global")
     }
 
@@ -50,22 +63,10 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun send(text: String, toId: String? = null) {
+    fun send(text: String, toId: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
             repo.sendMessage(text, toId)
-        }
-    }
-
-    fun ensureSignedIn() {
-        if (repo.currentUserId() == null) {
-            viewModelScope.launch {
-                try {
-                    repo.signInAnonymously()
-                } catch (e: Exception) {
-                    _error.value = e.message
-                }
-            }
         }
     }
 
