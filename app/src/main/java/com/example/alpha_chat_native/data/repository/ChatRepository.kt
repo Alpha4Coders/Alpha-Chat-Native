@@ -4,6 +4,7 @@ import android.net.Uri
 import com.example.alpha_chat_native.data.models.Conversation
 import com.example.alpha_chat_native.data.models.Message
 import com.example.alpha_chat_native.data.models.User
+import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
@@ -133,6 +134,22 @@ class ChatRepository @Inject constructor(
     
     suspend fun signInWithEmail(email: String, password: String) {
         auth.signInWithEmailAndPassword(email, password).await()
+    }
+    
+    suspend fun signInWithCredential(credential: AuthCredential) {
+        val authResult = auth.signInWithCredential(credential).await()
+        val user = authResult.user
+        if (user != null) {
+            // Check if user already exists in Firestore to avoid overwriting existing data if any
+            // Or just update/merge necessary fields
+             val userMap = User(
+                uid = user.uid,
+                email = user.email ?: "",
+                displayName = user.displayName ?: "",
+                imageUrl = user.photoUrl?.toString() ?: ""
+            )
+            usersRef.document(user.uid).set(userMap, SetOptions.merge()).await()
+        }
     }
 
     fun currentUserId(): String? = auth.currentUser?.uid

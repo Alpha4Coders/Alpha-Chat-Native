@@ -1,8 +1,11 @@
 package com.example.alpha_chat_native.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -31,6 +35,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.alpha_chat_native.R
 import com.example.alpha_chat_native.ui.viewmodels.LoginState
 import com.example.alpha_chat_native.ui.viewmodels.LoginViewModel
 import kotlin.random.Random
@@ -60,6 +65,7 @@ fun LoginScreen(
 
     val loginState by viewModel.loginState.collectAsState()
     val context = LocalContext.current
+    val activity = LocalContext.current as? androidx.activity.ComponentActivity
 
     LaunchedEffect(loginState) {
         when (val state = loginState) {
@@ -67,6 +73,7 @@ fun LoginScreen(
                 onLoginSuccess()
                 viewModel.resetState()
             }
+
             is LoginState.PasswordResetEmailSent -> {
                 Toast.makeText(context, "Password reset email sent to $email", Toast.LENGTH_LONG).show()
                 viewModel.resetState()
@@ -78,6 +85,28 @@ fun LoginScreen(
             else -> Unit
         }
     }
+
+    // GitHub Sign-In Logic (Requires Activity Context)
+    val onGithubSignIn: () -> Unit = {
+        if (activity != null) {
+            // Using Fully Qualified Name to avoid import resolution issues with newBuilder
+            val provider = com.google.firebase.auth.OAuthProvider.newBuilder("github.com")
+            val firebaseAuth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            
+            firebaseAuth.startActivityForSignInWithProvider(activity, provider.build())
+                .addOnSuccessListener { result ->
+                     if (result.credential != null) {
+                         viewModel.loginWithCredential(result.credential!!)
+                     }
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(context, "GitHub Login Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+             Toast.makeText(context, "Activity context not found", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicParticleBackground()
@@ -96,7 +125,8 @@ fun LoginScreen(
                 loginState = loginState,
                 onLogin = { viewModel.loginUser(email, password) },
                 onForgotPassword = { viewModel.resetPassword(email) },
-                onSignUpClick = onSignUpClick
+                onSignUpClick = onSignUpClick,
+                onGithubSignIn = onGithubSignIn
             )
         }
     }
@@ -113,7 +143,8 @@ fun TerminalLoginWindow(
     loginState: LoginState,
     onLogin: () -> Unit,
     onForgotPassword: () -> Unit,
-    onSignUpClick: () -> Unit
+    onSignUpClick: () -> Unit,
+    onGithubSignIn: () -> Unit
 ) {
     val terminalBg = Brush.linearGradient(
         listOf(
@@ -172,7 +203,8 @@ fun TerminalLoginWindow(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
+                    // ... Header ...
+                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -283,6 +315,21 @@ fun TerminalLoginWindow(
                         } else {
                             Text("EXECUTE LOGIN", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // GitHub Login Button
+                    Button(
+                        onClick = onGithubSignIn,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                        modifier = Modifier.fillMaxWidth(),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+                        enabled = loginState !is LoginState.Loading
+                    ) {
+                         // You would normally use a GitHub Icon here. For now, text.
+                         // If you have an icon resource: Icon(painterResource(id = R.drawable.github), ...)
+                         Text("Login with GitHub", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
