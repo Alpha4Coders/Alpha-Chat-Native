@@ -100,6 +100,9 @@ class MainActivity : ComponentActivity() {
                                     nav.navigate(Routes.CHAT(chatId)) {
                                         popUpTo(Routes.SelectUserScreen) { inclusive = true }
                                     }
+                                },
+                                onBack = {
+                                    nav.popBackStack()
                                 }
                             )
                         }

@@ -6,11 +6,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -19,9 +24,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alpha_chat_native.ui.viewmodels.LoginState
 import com.example.alpha_chat_native.ui.viewmodels.LoginViewModel
@@ -32,8 +40,6 @@ private val SplashBackground = Color(0xFF012106)
 private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
 
-// Define Particle Data Class (Must be public or internal to be visible inside Composable)
-// Renamed to avoid redeclaration conflict with other files
 private data class LoginParticle(
     val x: Float,
     val y: Float,
@@ -48,15 +54,13 @@ fun LoginScreen(
     onSignUpClick: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
-    // State to hold input values
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
 
-    // Observe ViewModel state
     val loginState by viewModel.loginState.collectAsState()
     val context = LocalContext.current
 
-    // React to state changes
     LaunchedEffect(loginState) {
         when (val state = loginState) {
             is LoginState.Success -> {
@@ -76,157 +80,223 @@ fun LoginScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // 1. The Dynamic Background from SplashScreen
         DynamicParticleBackground()
 
-        // 2. The Login Form Content
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
+            TerminalLoginWindow(
+                email = email,
+                onEmailChange = { email = it },
+                password = password,
+                onPasswordChange = { password = it },
+                showPassword = showPassword,
+                onToggleShowPassword = { showPassword = !showPassword },
+                loginState = loginState,
+                onLogin = { viewModel.loginUser(email, password) },
+                onForgotPassword = { viewModel.resetPassword(email) },
+                onSignUpClick = onSignUpClick
+            )
+        }
+    }
+}
 
-            // Glass Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(
-                    // Slightly more transparent white to let the dark background show through gently
-                    containerColor = Color.Black.copy(alpha = 0.90f)
-                ),
-                elevation = CardDefaults.cardElevation(12.dp)
-            ) {
+@Composable
+fun TerminalLoginWindow(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    showPassword: Boolean,
+    onToggleShowPassword: () -> Unit,
+    loginState: LoginState,
+    onLogin: () -> Unit,
+    onForgotPassword: () -> Unit,
+    onSignUpClick: () -> Unit
+) {
+    val terminalBg = Brush.linearGradient(
+        listOf(
+            Color(0xFF232526).copy(alpha = 0.9f),
+            Color(0xFF1E130C).copy(alpha = 0.9f),
+            Color(0xFF012106).copy(alpha = 0.8f)
+        )
+    )
+    
+    val borderColor = SplashPrimary
+    val textColor = Color.White
+    val accentColor = SplashPrimary
+    val secondaryAccent = SplashSecondary
+    val inputBg = Color(0xFF000000).copy(alpha = 0.5f)
+    val inputBorder = SplashPrimary.copy(alpha = 0.5f)
+    val inputText = Color.White
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(0.9f)
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+    ) {
+        Box(
+            modifier = Modifier.background(terminalBg)
+        ) {
+            Column {
+                // Terminal Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(10.dp).background(Color(0xFFFF5F56), CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(modifier = Modifier.size(10.dp).background(Color(0xFFFFBD2E), CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(modifier = Modifier.size(10.dp).background(Color(0xFF27C93F), CircleShape))
+
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "alpha-chat@terminal ~ login",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = SplashPrimary
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                
+                HorizontalDivider(color = borderColor, thickness = 1.dp)
+
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "AlphaChat Login",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = textColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = null,
+                            tint = secondaryAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
                     Text(
-                        text = "Alpha Chat 💬",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Magenta // Use brand color
+                        text = "$ ssh user@alpha-chat",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = SplashPrimary,
+                        modifier = Modifier.padding(bottom = 24.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Chat. Connect. Chill.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Green
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Email
+                    // Email Input
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Email") },
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
+                        onValueChange = onEmailChange,
+                        placeholder = { Text("Email", color = inputText.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SplashPrimary,
-                            focusedLabelColor = SplashPrimary
+                            focusedTextColor = inputText,
+                            unfocusedTextColor = inputText,
+                            focusedContainerColor = inputBg,
+                            unfocusedContainerColor = inputBg,
+                            focusedBorderColor = inputBorder,
+                            unfocusedBorderColor = inputBorder.copy(alpha = 0.5f)
                         ),
-                        enabled = loginState !is LoginState.Loading
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = inputBorder) }
                     )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Password
+                    // Password Input
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Password") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
+                        onValueChange = onPasswordChange,
+                        placeholder = { Text("Password", color = inputText.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SplashPrimary,
-                            focusedLabelColor = SplashPrimary
+                            focusedTextColor = inputText,
+                            unfocusedTextColor = inputText,
+                            focusedContainerColor = inputBg,
+                            unfocusedContainerColor = inputBg,
+                            focusedBorderColor = inputBorder,
+                            unfocusedBorderColor = inputBorder.copy(alpha = 0.5f)
                         ),
-                        enabled = loginState !is LoginState.Loading
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+                        visualTransformation = if (!showPassword) PasswordVisualTransformation() else VisualTransformation.None,
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = inputBorder) },
+                        trailingIcon = {
+                            IconButton(onClick = onToggleShowPassword) {
+                                Icon(
+                                    imageVector = if (showPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle password",
+                                    tint = inputText
+                                )
+                            }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Forgot Password
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                         Text(
                             text = "Forgot Password?",
-                            color = SplashPrimary,
+                            color = secondaryAccent,
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.clickable {
-                                viewModel.resetPassword(email)
-                            }
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.clickable(onClick = onForgotPassword)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Gradient Button (Updated to match Theme)
                     Button(
-                        onClick = { viewModel.loginUser(email, password) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        ),
-                        contentPadding = PaddingValues(),
+                        onClick = onLogin,
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        modifier = Modifier.fillMaxWidth(),
                         enabled = loginState !is LoginState.Loading
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            SplashPrimary,
-                                            Color(0xFF09D668) // Slightly lighter green
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(20.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (loginState is LoginState.Loading) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = "Sign In",
-                                    color = Color.Black,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                        if (loginState is LoginState.Loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black)
+                        } else {
+                            Text("EXECUTE LOGIN", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Sign Up
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Don’t have an account?", color = Color.White)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("New User? ", color = Color.White, fontFamily = FontFamily.Monospace)
                         Text(
-                            text = "Sign up",
-                            color = SplashPrimary,
+                            text = "./register.sh",
+                            color = secondaryAccent,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable {
-                                if (loginState !is LoginState.Loading) onSignUpClick()
-                            }
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.clickable(onClick = onSignUpClick)
                         )
                     }
                 }
@@ -235,13 +305,10 @@ fun LoginScreen(
     }
 }
 
-// --- Extracted Background Logic from SplashScreen ---
-
 @Composable
 fun DynamicParticleBackground() {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
 
-    // Pulse Animation
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.5f,
@@ -261,7 +328,6 @@ fun DynamicParticleBackground() {
         label = "pulseAlpha"
     )
 
-    // Particles Setup
     val particles = remember {
         List(20) {
             LoginParticle(
@@ -284,7 +350,6 @@ fun DynamicParticleBackground() {
         label = "particleProgress"
     )
 
-    // Background Container
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -299,7 +364,6 @@ fun DynamicParticleBackground() {
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Draw Particles
         Canvas(modifier = Modifier.fillMaxSize()) {
             particles.forEach { particle ->
                 val animatedY = (particle.y + particleProgress * particle.speed * 100) % 1f
@@ -314,7 +378,6 @@ fun DynamicParticleBackground() {
             }
         }
 
-        // Draw Pulsing Circle 1
         Canvas(
             modifier = Modifier
                 .size(200.dp)
@@ -329,7 +392,6 @@ fun DynamicParticleBackground() {
             )
         }
 
-        // Second Pulse (Offset)
         val pulseScale2 by infiniteTransition.animateFloat(
             initialValue = 1f,
             targetValue = 1.8f,
@@ -349,7 +411,6 @@ fun DynamicParticleBackground() {
             label = "pulseAlpha2"
         )
 
-        // Draw Pulsing Circle 2
         Canvas(
             modifier = Modifier
                 .size(200.dp)

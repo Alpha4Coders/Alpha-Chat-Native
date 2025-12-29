@@ -42,7 +42,7 @@ fun UserRegistrationScreen(
     vm: ChatViewModel = hiltViewModel()
 ) {
     var userName by remember { mutableStateOf("") }
-    var github by remember { mutableStateOf("") } // Used as Email input in logic for now, or profile link? Assuming email from usage context or generic field.
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
@@ -75,8 +75,8 @@ fun UserRegistrationScreen(
             TerminalWindow(
                 userName = userName,
                 onUserNameChange = { userName = it },
-                github = github,
-                onGithubChange = { github = it },
+                email = email,
+                onEmailChange = { email = it },
                 password = password,
                 onPasswordChange = { password = it },
                 showPassword = showPassword,
@@ -84,9 +84,7 @@ fun UserRegistrationScreen(
                 isLoading = isLoading,
                 error = error,
                 onSignup = {
-                    // Note: vm.register usually expects (name, email, password)
-                    // If 'github' variable is intended to be email, it's fine. 
-                    vm.register(userName, github, password) {
+                    vm.register(userName, email, password) {
                          onRegisterSuccess()
                     }
                 },
@@ -221,8 +219,8 @@ private data class RegistrationParticle(
 fun TerminalWindow(
     userName: String,
     onUserNameChange: (String) -> Unit,
-    github: String,
-    onGithubChange: (String) -> Unit,
+    email: String,
+    onEmailChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
     showPassword: Boolean,
@@ -341,9 +339,9 @@ fun TerminalWindow(
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     TerminalInput(
-                        value = github,
-                        onValueChange = onGithubChange,
-                        placeholder = "Email / GitHub",
+                        value = email,
+                        onValueChange = onEmailChange,
+                        placeholder = "Email",
                         textColor = inputText,
                         bgColor = inputBg,
                         borderColor = inputBorder

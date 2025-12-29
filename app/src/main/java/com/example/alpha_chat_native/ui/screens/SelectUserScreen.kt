@@ -1,7 +1,6 @@
 package com.example.alpha_chat_native.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,8 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,13 +41,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.alpha_chat_native.R
 import com.example.alpha_chat_native.data.models.User
 import com.example.alpha_chat_native.vm.ChatViewModel
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 private val SplashBackground = Color(0xFF012106)
 
@@ -89,19 +96,42 @@ fun SelectUserScreen(
                 )
             }
         ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                items(users.filter { it.uid != currentUserId }) { user ->
-                    val chatId = if (currentUserId != null) {
-                        if (currentUserId < user.uid) "${currentUserId}_${user.uid}" else "${user.uid}_${currentUserId}"
-                    } else {
-                        user.uid 
+            // Filter users: exclude current user and ensure they have a display name (created profile)
+            val filteredUsers = users.filter { 
+                it.uid != currentUserId && it.displayName.isNotBlank() 
+            }
+
+            if (filteredUsers.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                         Text(
+                            text = "No other users found.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    UserItem(user = user) {
-                        onUserSelected(chatId)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    items(filteredUsers) { user ->
+                        val chatId = if (currentUserId != null) {
+                            if (currentUserId < user.uid) "${currentUserId}_${user.uid}" else "${user.uid}_${currentUserId}"
+                        } else {
+                            user.uid 
+                        }
+                        UserItem(user = user) {
+                            onUserSelected(chatId)
+                        }
                     }
                 }
             }
@@ -134,7 +164,18 @@ fun UserItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val imageModel = user.imageUrl.ifEmpty { "https://ui-avatars.com/api/?name=${user.displayName}" }
+            val displayName = user.displayName.ifBlank { "Unknown User" }
+            val encodedName = try {
+                URLEncoder.encode(displayName, StandardCharsets.UTF_8.toString())
+            } catch (e: Exception) {
+                "User"
+            }
+            
+            val imageModel = if (user.imageUrl.isNotEmpty()) {
+                user.imageUrl
+            } else {
+                "https://ui-avatars.com/api/?name=$encodedName&background=random&color=fff"
+            }
 
             Box(
                 modifier = Modifier
@@ -142,8 +183,13 @@ fun UserItem(
                     .clip(CircleShape)
                     .border(BorderStroke(1.dp, splashPrimary.copy(alpha = 0.5f)), CircleShape)
             ) {
-                Image(
-                    painter = rememberAsyncImagePainter(model = imageModel),
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imageModel)
+                        .crossfade(true)
+                        .error(R.drawable.logo)
+                        .placeholder(R.drawable.logo)
+                        .build(),
                     contentDescription = "User Avatar",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -154,7 +200,7 @@ fun UserItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = user.displayName.ifBlank { "Unknown User" },
+                    text = displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
