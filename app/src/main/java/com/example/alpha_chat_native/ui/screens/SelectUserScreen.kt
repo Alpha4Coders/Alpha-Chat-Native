@@ -48,7 +48,6 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.alpha_chat_native.data.models.User
 import com.example.alpha_chat_native.vm.ChatViewModel
 
-// --- Theme Colors ---
 private val SplashBackground = Color(0xFF012106)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +60,6 @@ fun SelectUserScreen(
     val users by vm.users.collectAsState()
     val currentUserId = vm.currentUserId
 
-    // Background Gradient
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
             SplashBackground,
@@ -136,7 +134,7 @@ fun UserItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val imageModel = if (user.imageUrl.isNotEmpty()) user.imageUrl else "https://ui-avatars.com/api/?name=${user.displayName}"
+            val imageModel = user.imageUrl.ifEmpty { "https://ui-avatars.com/api/?name=${user.displayName}" }
 
             Box(
                 modifier = Modifier
