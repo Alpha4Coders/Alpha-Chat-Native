@@ -14,12 +14,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.example.alpha_chat_native.Presentation.Navigation.Routes
 import com.example.alpha_chat_native.ui.screens.*
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        
+        try {
+            enableEdgeToEdge()
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to enable edge to edge")
+        }
+
         setContent {
             AlphaChatNativeTheme {
                 Surface(modifier = Modifier) {

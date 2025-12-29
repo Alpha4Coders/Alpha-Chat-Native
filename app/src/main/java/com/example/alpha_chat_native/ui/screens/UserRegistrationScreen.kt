@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +42,7 @@ fun UserRegistrationScreen(
     vm: ChatViewModel = hiltViewModel()
 ) {
     var userName by remember { mutableStateOf("") }
-    var github by remember { mutableStateOf("") }
+    var github by remember { mutableStateOf("") } // Used as Email input in logic for now, or profile link? Assuming email from usage context or generic field.
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
@@ -82,6 +84,8 @@ fun UserRegistrationScreen(
                 isLoading = isLoading,
                 error = error,
                 onSignup = {
+                    // Note: vm.register usually expects (name, email, password)
+                    // If 'github' variable is intended to be email, it's fine. 
                     vm.register(userName, github, password) {
                          onRegisterSuccess()
                     }
@@ -339,98 +343,54 @@ fun TerminalWindow(
                     TerminalInput(
                         value = github,
                         onValueChange = onGithubChange,
-                        placeholder = "GitHub / Email",
+                        placeholder = "Email / GitHub",
                         textColor = inputText,
                         bgColor = inputBg,
                         borderColor = inputBorder
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    TerminalInput(
+                        value = password,
+                        onValueChange = onPasswordChange,
+                        placeholder = "Password",
+                        textColor = inputText,
+                        bgColor = inputBg,
+                        borderColor = inputBorder,
+                        isPassword = true,
+                        showPassword = showPassword,
+                        onToggleShowPassword = onToggleShowPassword
+                    )
                     
-                    // Password Field
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        TerminalInput(
-                            value = password,
-                            onValueChange = onPasswordChange,
-                            placeholder = "Password",
-                            textColor = inputText,
-                            bgColor = inputBg,
-                            borderColor = inputBorder,
-                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation()
-                        )
-                        TextButton(
-                            onClick = onToggleShowPassword,
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)
-                        ) {
-                            Text(
-                                text = if (showPassword) "Hide" else "Show",
-                                color = accentColor,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     if (error != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = error,
+                            text = "Error: $error",
                             color = Color.Red,
+                            fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Signup Button
-                    val buttonBrush = Brush.horizontalGradient(listOf(SplashPrimary, SplashSecondary))
-                    
                     Button(
                         onClick = onSignup,
-                        enabled = !isLoading,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        contentPadding = PaddingValues()
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(buttonBrush),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                            } else {
-                                Text(
-                                    text = "Sign Up",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black)
+                        } else {
+                            Text("EXECUTE SIGNUP", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Login Link
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Already have an account?",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        TextButton(onClick = onNavigateToLogin) {
-                            Text(
-                                text = "Login",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = accentColor
-                            )
-                        }
+                    TextButton(onClick = onNavigateToLogin) {
+                         Text("< Back to Login", color = secondaryAccent, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -446,25 +406,36 @@ fun TerminalInput(
     textColor: Color,
     bgColor: Color,
     borderColor: Color,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    isPassword: Boolean = false,
+    showPassword: Boolean = false,
+    onToggleShowPassword: (() -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, fontFamily = FontFamily.Monospace, color = textColor.copy(alpha = 0.6f)) },
-        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(placeholder, color = textColor.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace) },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = bgColor,
-            unfocusedContainerColor = bgColor,
             focusedTextColor = textColor,
             unfocusedTextColor = textColor,
+            focusedContainerColor = bgColor,
+            unfocusedContainerColor = bgColor,
             focusedBorderColor = borderColor,
-            unfocusedBorderColor = borderColor.copy(alpha = 0.5f),
-            cursorColor = textColor
+            unfocusedBorderColor = borderColor.copy(alpha = 0.5f)
         ),
-        shape = RoundedCornerShape(4.dp),
         singleLine = true,
-        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace),
-        visualTransformation = visualTransformation
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+        visualTransformation = if (isPassword && !showPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        trailingIcon = {
+            if (isPassword && onToggleShowPassword != null) {
+                IconButton(onClick = onToggleShowPassword) {
+                    Icon(
+                        imageVector = if (showPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = "Toggle password",
+                        tint = textColor
+                    )
+                }
+            }
+        }
     )
 }

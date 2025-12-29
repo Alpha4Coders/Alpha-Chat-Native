@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -50,15 +51,24 @@ class ChatViewModel @Inject constructor(
         get() = repo.currentUserId()
     
     init {
-        // Initial load of global chat or last chat
-        loadMessages("global")
+        // Safe initialization
+        try {
+            loadMessages("global")
+        } catch (e: Exception) {
+            Timber.e(e, "Error loading messages in init")
+            _error.value = "Failed to load messages"
+        }
     }
 
     fun loadMessages(chatId: String) {
         _currentChatId.value = chatId
         viewModelScope.launch {
-             repo.observeMessages(chatId).collect { msgs ->
-                 _messages.value = msgs
+             try {
+                 repo.observeMessages(chatId).collect { msgs ->
+                     _messages.value = msgs
+                 }
+             } catch (e: Exception) {
+                 Timber.e(e, "Error observing messages")
              }
         }
     }
@@ -66,12 +76,22 @@ class ChatViewModel @Inject constructor(
     fun send(text: String, toId: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
-            repo.sendMessage(text, toId)
+            try {
+                repo.sendMessage(text, toId)
+            } catch (e: Exception) {
+                _error.value = "Failed to send message"
+                Timber.e(e, "Error sending message")
+            }
         }
     }
 
     fun isLoggedIn(): Boolean {
-        return repo.currentUserId() != null
+        return try {
+            repo.currentUserId() != null
+        } catch (e: Exception) {
+            Timber.e(e, "Error checking login status")
+            false
+        }
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
@@ -119,8 +139,12 @@ class ChatViewModel @Inject constructor(
 
     fun signOut(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            repo.signOut()
-            onSuccess()
+            try {
+                repo.signOut()
+                onSuccess()
+            } catch (e: Exception) {
+                _error.value = "Sign out failed"
+            }
         }
     }
 

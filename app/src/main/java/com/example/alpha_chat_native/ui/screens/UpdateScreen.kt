@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
 import java.io.File
+import timber.log.Timber
 
 data class StatusUpdate(val userName: String, val imageUri: Uri, val timestamp: String)
 
@@ -69,9 +70,14 @@ fun UpdateScreen() {
         if (isGranted) {
             try {
                 val uri = createImageFileUri(context)
-                tempImageUri = uri
-                cameraLauncher.launch(uri)
+                if (uri != null) {
+                    tempImageUri = uri
+                    cameraLauncher.launch(uri)
+                } else {
+                     Toast.makeText(context, "Failed to create image URI", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
+                Timber.e(e, "Failed to create image file URI")
                 Toast.makeText(context, "Failed to create image file: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
             }
@@ -254,11 +260,16 @@ fun StatusViewer(status: StatusUpdate, onDismiss: () -> Unit) {
     }
 }
 
-fun createImageFileUri(context: Context): Uri {
-    val file = File.createTempFile("status_image", ".jpg", context.cacheDir)
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.provider",
-        file
-    )
+fun createImageFileUri(context: Context): Uri? {
+    try {
+        val file = File.createTempFile("status_image", ".jpg", context.cacheDir)
+        return FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+    } catch (e: Exception) {
+        Timber.e(e, "Error creating image file URI")
+        return null
+    }
 }

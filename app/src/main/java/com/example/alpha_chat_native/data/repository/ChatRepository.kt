@@ -27,10 +27,11 @@ class ChatRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val storage: FirebaseStorage
 ) {
-    private val messagesRef = firestore.collection("messages")
-    private val usersRef = firestore.collection("users")
-    private val conversationsRef = firestore.collection("conversations")
-    private val storageRef = storage.reference
+    // Use getters to lazily access collections, avoiding immediate crash if dependencies aren't fully ready
+    private val messagesRef get() = firestore.collection("messages")
+    private val usersRef get() = firestore.collection("users")
+    private val conversationsRef get() = firestore.collection("conversations")
+    private val storageRef get() = storage.reference
 
     private suspend fun getCurrentUserIdEnsuringAuth(): String {
         var currentUser = auth.currentUser
@@ -107,7 +108,6 @@ class ChatRepository @Inject constructor(
                 val convos = snap?.documents?.mapNotNull {
                     val conversation = it.toObject(Conversation::class.java)?.copy(id = it.id)
                     conversation?.let { convo ->
-                        val otherId = convo.participantIds.firstOrNull { id -> id != fromId }
                         // You would fetch user details here and attach to the conversation object
                         // For now, we will do this in the ViewModel
                     }
