@@ -23,7 +23,7 @@ sealed class Routes {
     @Serializable
     data class CHAT(val chatId: String):Routes()
     @Serializable
-    data object SelectUserScreen:Routes() // For starting a new chat
+    data object SelectUserScreen:Routes()
     @Serializable
     data object ProfileScreen:Routes()
 }
