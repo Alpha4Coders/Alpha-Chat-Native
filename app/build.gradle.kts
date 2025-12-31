@@ -6,6 +6,7 @@ plugins {
     id("kotlin-kapt")
     alias(libs.plugins.hilt.android)
     id("com.google.gms.google-services")
+    id("io.realm.kotlin") version "2.0.0"
 }
 
 android {
@@ -96,6 +97,10 @@ dependencies {
     implementation(libs.converter.moshi)
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
+
+    // --- MongoDB Realm ---
+    implementation("io.realm.kotlin:library-base:2.0.0")
+    implementation("io.realm.kotlin:library-sync:2.0.0") // If you need Sync
 
     // --- Testing ---
     testImplementation(libs.junit)

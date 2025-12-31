@@ -48,17 +48,24 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundBrush)
+            .background(if (selectedIndex == 2) DiscordBackground else Color.Transparent)
     ) {
-        // Shared Background Animation
-        HomeParticleBackground()
+        if (selectedIndex != 2) {
+             Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(backgroundBrush)
+            )
+             // Shared Background Animation
+            HomeParticleBackground()
+        }
 
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
                 NavigationBar(
-                    containerColor = navBarColor,
-                    contentColor = navContentColor
+                    containerColor = if (selectedIndex == 2) DiscordSidebar else navBarColor,
+                    contentColor = if (selectedIndex == 2) DiscordText else navContentColor
                 ) {
                     NavigationBarItem(
                         icon = { Icon(Icons.Filled.Home, contentDescription = "Chats") },
