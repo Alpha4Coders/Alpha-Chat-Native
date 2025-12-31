@@ -3,9 +3,10 @@ package com.example.alpha_chat_native.ui.screens
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,20 +16,23 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 
 // --- Colors from SplashScreen ---
 private val SplashBackground = Color(0xFF012106)
 private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
+private val GitHubBlack = Color(0xFF24292e)
 
 @Composable
 fun WelcomeScreen(
     onNavigateToLogin: () -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit = {}  // Deprecated - not used
 ) {
     Box(
         modifier = Modifier
@@ -68,88 +72,118 @@ fun WelcomeScreen(
                     modifier = Modifier.padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // App Icon Row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = null,
+                            tint = SplashPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "AlphaChat",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = SplashPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     Text(
-                        text = "Alpha Chat 💬",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Magenta,
-                        textAlign = TextAlign.Center
+                        text = "v2.0 • Unified",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                        color = SplashSecondary
                     )
+                    
                     Spacer(modifier = Modifier.height(12.dp))
+                    
                     Text(
-                        text = "Connect with friends and community easily.",
+                        text = "Real-time messaging for developers.\nSync across web & mobile.",
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
-                        color = Color.Green
+                        fontFamily = FontFamily.Monospace,
+                        color = Color.White.copy(alpha = 0.7f),
+                        lineHeight = 24.sp
                     )
-                    Spacer(modifier = Modifier.height(48.dp))
+                    
+                    Spacer(modifier = Modifier.height(40.dp))
 
-                    // Gradient Button (Log In)
+                    // GitHub Login Button
                     Button(
                         onClick = onNavigateToLogin,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        ),
-                        contentPadding = PaddingValues()
+                            containerColor = GitHubBlack
+                        )
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            SplashPrimary,
-                                            Color(0xFF09D668)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(20.dp)
-                                ),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Log In",
-                                color = Color.Black,
+                                text = "󰊤",  // GitHub icon
+                                fontSize = 24.sp,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Continue with GitHub",
+                                color = Color.White,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Outlined Button (Sign Up) - Custom Styling
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .background(
-                                color = Color.Transparent, 
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .clickable { onNavigateToRegister() }
-                            .padding(1.dp) // simulate border
-                            .background(
-                                color = Color.White.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(20.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Features list
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
                     ) {
-                        // Inner content
-                         Text(
-                            text = "Sign Up",
-                            color = SplashPrimary,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        FeatureItem("✓ End-to-end sync with web")
+                        FeatureItem("✓ Real-time messaging")
+                        FeatureItem("✓ Developer channels")
+                        FeatureItem("✓ Code sharing support")
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "Powered by alphachat-v2-backend.onrender.com",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color.White.copy(alpha = 0.4f),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun FeatureItem(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        fontFamily = FontFamily.Monospace,
+        color = SplashPrimary,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
 }
 
 // Reusing background logic
@@ -174,6 +208,14 @@ fun WelcomeParticleBackground() {
             repeatMode = RepeatMode.Restart
         ),
         label = "pulseAlpha"
+    )
+
+    data class WelcomeParticle(
+        val x: Float,
+        val y: Float,
+        val size: Float,
+        val speed: Float,
+        val alpha: Float
     )
 
     val particles = remember {
@@ -212,12 +254,13 @@ fun WelcomeParticleBackground() {
         }
     }
 
+    // Pulsing Blob 1
     Canvas(
         modifier = Modifier
+            .offset(x = 50.dp, y = 100.dp)
             .size(200.dp)
             .scale(pulseScale)
             .alpha(pulseAlpha)
-            .wrapContentSize(Alignment.Center) 
     ) {
         drawCircle(
             brush = Brush.radialGradient(
@@ -226,32 +269,14 @@ fun WelcomeParticleBackground() {
             radius = size.minDimension / 2
         )
     }
-    
-    val pulseScale2 by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, delayMillis = 500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseScale2"
-    )
-    val pulseAlpha2 by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, delayMillis = 500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha2"
-    )
 
+    // Pulsing Blob 2
     Canvas(
         modifier = Modifier
+            .offset(x = 300.dp, y = 600.dp)
             .size(200.dp)
-            .scale(pulseScale2)
-            .alpha(pulseAlpha2)
-            .wrapContentSize(Alignment.Center)
+            .scale(pulseScale)
+            .alpha(pulseAlpha)
     ) {
         drawCircle(
             brush = Brush.radialGradient(
@@ -261,11 +286,3 @@ fun WelcomeParticleBackground() {
         )
     }
 }
-
-private data class WelcomeParticle(
-    val x: Float,
-    val y: Float,
-    val size: Float,
-    val speed: Float,
-    val alpha: Float
-)

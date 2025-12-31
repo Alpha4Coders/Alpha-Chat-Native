@@ -6,17 +6,21 @@ import androidx.lifecycle.viewModelScope
 import com.example.alpha_chat_native.data.models.Conversation
 import com.example.alpha_chat_native.data.models.Message
 import com.example.alpha_chat_native.data.models.User
+import com.example.alpha_chat_native.data.models.Channel
 import com.example.alpha_chat_native.data.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Main ViewModel for chat functionality.
+ * Uses ChatRepository which connects to Express backend via Retrofit + Socket.IO.
+ */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val repo: ChatRepository
@@ -27,19 +31,18 @@ class ChatViewModel @Inject constructor(
 
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
     val messages = _messages.asStateFlow()
-    
+
+    // Users from API
     val users = repo.observeUsers()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Combine conversations with users to populate the 'otherUser' field
-    val conversations = combine(repo.observeConversations(), users) { convos, allUsers ->
-        val currentUid = repo.currentUserId()
-        convos.map { convo ->
-            val otherId = convo.participantIds.firstOrNull { it != currentUid }
-            val otherUser = allUsers.find { it.uid == otherId }
-            convo.copy(otherUser = otherUser)
-        }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    // Conversations from API with otherUser populated
+    val conversations = repo.observeConversations()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // Channels from API
+    val channels = repo.observeChannels()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
@@ -49,35 +52,79 @@ class ChatViewModel @Inject constructor(
 
     val currentUserId: String?
         get() = repo.currentUserId()
-    
+
     init {
-        // Safe initialization
-        try {
-            loadMessages("global")
-        } catch (e: Exception) {
-            Timber.e(e, "Error loading messages in init")
-            _error.value = "Failed to load messages"
+        // Listen for incoming messages from Socket.IO
+        viewModelScope.launch {
+            repo.observeIncomingMessages().collect { message ->
+                // Add to messages if it's for the current chat
+                if (message.conversation == _currentChatId.value || 
+                    message.fromId == currentUserId ||
+                    message.toId == currentUserId) {
+                    _messages.value = _messages.value + message
+                }
+            }
+        }
+
+        // Initial data fetch if logged in
+        if (repo.hasSession()) {
+            refreshData()
         }
     }
 
+    /**
+     * Refresh all data from API
+     */
+    fun refreshData() {
+        viewModelScope.launch {
+            try {
+                repo.fetchUsers()
+                repo.fetchConversations()
+                repo.fetchChannels()
+            } catch (e: Exception) {
+                Timber.e(e, "Error refreshing data")
+            }
+        }
+    }
+
+    /**
+     * Load messages for a specific chat/conversation
+     */
     fun loadMessages(chatId: String) {
         _currentChatId.value = chatId
         viewModelScope.launch {
-             try {
-                 repo.observeMessages(chatId).collect { msgs ->
-                     _messages.value = msgs
-                 }
-             } catch (e: Exception) {
-                 Timber.e(e, "Error observing messages")
-             }
+            try {
+                _isLoading.value = true
+                
+                // Get recipient ID from chatId (format: "userId1_userId2")
+                val parts = chatId.split("_")
+                val recipientId = parts.find { it != currentUserId } ?: parts.firstOrNull()
+                
+                if (recipientId != null) {
+                    val detail = repo.getConversation(recipientId)
+                    _messages.value = detail?.messages ?: emptyList()
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading messages")
+                _error.value = "Failed to load messages"
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
+    /**
+     * Send a message
+     */
     fun send(text: String, toId: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
             try {
-                repo.sendMessage(text, toId)
+                val message = repo.sendDirectMessage(toId, text)
+                if (message != null) {
+                    // Add to local list immediately (Socket will also broadcast)
+                    _messages.value = _messages.value + message
+                }
             } catch (e: Exception) {
                 _error.value = "Failed to send message"
                 Timber.e(e, "Error sending message")
@@ -85,80 +132,40 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Check if user is logged in
+     */
     fun isLoggedIn(): Boolean {
-        return try {
-            repo.currentUserId() != null
-        } catch (e: Exception) {
-            Timber.e(e, "Error checking login status")
-            false
-        }
+        return repo.hasSession()
     }
 
-    fun login(email: String, pass: String, onSuccess: () -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
-            _error.value = "Email and password cannot be empty"
-            return
-        }
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                repo.signInWithEmail(email, pass)
-                onSuccess()
-            } catch (e: Exception) {
-                _error.value = e.message ?: "Login failed"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun register(name: String, email: String, pass: String, onSuccess: () -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
-            _error.value = "Email and password cannot be empty"
-            return
-        }
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                repo.createAccount(email, pass)
-                repo.updateUserProfile(name)
-                onSuccess()
-            } catch (e: Exception) {
-                _error.value = e.message ?: "Registration failed"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-    
-    fun clearError() {
-        _error.value = null
-    }
-
+    /**
+     * Sign out
+     */
     fun signOut(onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                repo.signOut()
+                repo.logout()
                 onSuccess()
             } catch (e: Exception) {
                 _error.value = "Sign out failed"
+                Timber.e(e, "Error signing out")
             }
         }
     }
 
+    /**
+     * Update profile (name and image)
+     * Note: For GitHub OAuth users, profile updates are limited
+     */
     fun updateProfile(name: String, imageUri: Uri?, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                val imageUrl = if (imageUri != null) {
-                    repo.uploadProfileImage(imageUri)
-                } else {
-                    null
-                }
-                repo.updateUserProfile(name, imageUrl)
+                // Profile is managed by GitHub OAuth - limited editing
+                // Just refresh user data
+                repo.getCurrentUser()
                 onSuccess()
             } catch (e: Exception) {
                 _error.value = e.message ?: "Update failed"
@@ -166,5 +173,40 @@ class ChatViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * Clear error state
+     */
+    fun clearError() {
+        _error.value = null
+    }
+
+    /**
+     * Send typing indicator
+     */
+    fun sendTyping(recipientId: String, isTyping: Boolean) {
+        repo.sendTypingIndicator(recipientId, isTyping)
+    }
+
+    /**
+     * Mark messages as read
+     */
+    fun markAsRead(conversationId: String, senderId: String) {
+        repo.markMessagesAsRead(conversationId, senderId)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LEGACY METHODS (for backwards compatibility during migration)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Deprecated("Use LoginViewModel for auth")
+    fun login(email: String, pass: String, onSuccess: () -> Unit) {
+        _error.value = "Please use GitHub login"
+    }
+
+    @Deprecated("Use LoginViewModel for auth")
+    fun register(name: String, email: String, pass: String, onSuccess: () -> Unit) {
+        _error.value = "Please use GitHub login"
     }
 }

@@ -98,6 +98,14 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
 
+    // --- Socket.IO for real-time messaging ---
+    implementation("io.socket:socket.io-client:2.1.0") {
+        exclude(group = "org.json", module = "json")
+    }
+
+    // --- DataStore for session persistence ---
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
     // --- MongoDB Realm ---
     implementation("io.realm.kotlin:library-base:2.0.0")
     implementation("io.realm.kotlin:library-sync:2.0.0") // If you need Sync

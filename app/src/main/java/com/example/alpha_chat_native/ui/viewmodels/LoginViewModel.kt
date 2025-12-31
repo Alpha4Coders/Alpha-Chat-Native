@@ -2,95 +2,114 @@ package com.example.alpha_chat_native.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.AuthCredential
-import com.google.firebase.auth.FirebaseAuth
+import com.example.alpha_chat_native.data.models.User
+import com.example.alpha_chat_native.data.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * ViewModel for Login screen.
+ * Handles GitHub OAuth authentication flow.
+ */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val auth: FirebaseAuth // Injected via Hilt
+    private val repository: ChatRepository
 ) : ViewModel() {
 
-    // UI State to track loading and errors
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
-    fun loginUser(email: String, pass: String) {
-        if (email.isBlank() || pass.isBlank()) {
-            _loginState.value = LoginState.Error("Please fill in all fields")
-            return
-        }
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
-        viewModelScope.launch {
-            _loginState.value = LoginState.Loading
-            try {
-                auth.signInWithEmailAndPassword(email, pass).await()
-                _loginState.value = LoginState.Success
-            } catch (e: Exception) {
-                _loginState.value = LoginState.Error(e.message ?: "Login failed")
+    init {
+        // Check if already authenticated
+        checkExistingSession()
+    }
+
+    /**
+     * Check for existing session on app start
+     */
+    private fun checkExistingSession() {
+        if (repository.hasSession()) {
+            viewModelScope.launch {
+                _loginState.value = LoginState.Loading
+                try {
+                    val user = repository.checkAuth()
+                    if (user != null) {
+                        _currentUser.value = user
+                        _loginState.value = LoginState.Success
+                    } else {
+                        _loginState.value = LoginState.Idle
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Session check failed")
+                    _loginState.value = LoginState.Idle
+                }
             }
         }
     }
 
-    fun loginWithCredential(credential: AuthCredential) {
+    /**
+     * Handle OAuth callback after GitHub login
+     * Called when WebView captures the session cookies
+     */
+    fun handleOAuthCallback(cookies: String) {
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
             try {
-                // This would be handled in repository ideally to sync user data, but for now we do it here or assume Repository does it if we used it.
-                // However, LoginViewModel currently uses FirebaseAuth directly.
-                // To properly support the "create user in Firestore" requirement, we should ideally move this logic to Repository or do it here.
-                val authResult = auth.signInWithCredential(credential).await()
-                // IMPORTANT: We need to ensure the user exists in Firestore
-                // Since we don't have Repository injected here (only FirebaseAuth), we can't easily call repository methods.
-                // But wait, the user asked to "build this feature". 
-                // I should probably inject ChatRepository instead of FirebaseAuth to be consistent with the app architecture,
-                // OR handle the firestore creation here if I must. 
-                // Given the existing code uses FirebaseAuth directly, I will stick to that but I really should call a repository method.
-                // Let's refactor LoginViewModel to use ChatRepository if possible, or just keep it simple.
-                // Actually, the ChatRepository has `signInWithCredential` now. I should use it.
-                // But LoginViewModel currently injects `FirebaseAuth`.
-                // I will update LoginViewModel to inject ChatRepository instead.
-                 _loginState.value = LoginState.Success
+                val user = repository.handleOAuthCallback(cookies)
+                if (user != null) {
+                    _currentUser.value = user
+                    _loginState.value = LoginState.Success
+                    Timber.d("OAuth callback successful: ${user.username}")
+                } else {
+                    _loginState.value = LoginState.Error("Authentication failed. Please try again.")
+                }
             } catch (e: Exception) {
-                 _loginState.value = LoginState.Error(e.message ?: "GitHub Login failed")
+                Timber.e(e, "OAuth callback failed")
+                _loginState.value = LoginState.Error(e.message ?: "Authentication failed")
             }
         }
     }
 
-    fun resetPassword(email: String) {
-        if (email.isBlank()) {
-            _loginState.value = LoginState.Error("Please enter your email to reset password")
-            return
-        }
-
-        viewModelScope.launch {
-            _loginState.value = LoginState.Loading
-            try {
-                auth.sendPasswordResetEmail(email).await()
-                _loginState.value = LoginState.PasswordResetEmailSent
-            } catch (e: Exception) {
-                _loginState.value = LoginState.Error(e.message ?: "Failed to send reset email")
-            }
-        }
-    }
-
-    // Reset state after navigation or error dismissal
+    /**
+     * Reset state after navigation or error dismissal
+     */
     fun resetState() {
         _loginState.value = LoginState.Idle
     }
+
+    /**
+     * Get the GitHub OAuth URL
+     */
+    fun getOAuthUrl(): String {
+        return "https://alphachat-v2-backend.onrender.com/api/auth/github"
+    }
+
+    /**
+     * Check if a URL is the OAuth success callback
+     */
+    fun isOAuthCallback(url: String): Boolean {
+        return url.contains("/chat") || 
+               url.contains("alphachat-v2.vercel.app") ||
+               url.contains("localhost:5173")
+    }
 }
 
-// Sealed class to represent the different states of the login screen
+/**
+ * Login screen state
+ */
 sealed class LoginState {
     object Idle : LoginState()
     object Loading : LoginState()
     object Success : LoginState()
-    object PasswordResetEmailSent : LoginState()
     data class Error(val message: String) : LoginState()
+    
+    // Removed PasswordResetEmailSent - no longer using email/password
 }

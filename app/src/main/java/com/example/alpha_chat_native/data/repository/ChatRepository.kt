@@ -1,194 +1,407 @@
 package com.example.alpha_chat_native.data.repository
 
-import android.net.Uri
-import com.example.alpha_chat_native.data.models.Conversation
-import com.example.alpha_chat_native.data.models.Message
-import com.example.alpha_chat_native.data.models.User
-import com.google.firebase.auth.AuthCredential
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.SetOptions
-import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
+import com.example.alpha_chat_native.data.models.*
+import com.example.alpha_chat_native.data.remote.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
-import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Repository for all chat operations.
+ * Uses Retrofit for API calls and Socket.IO for real-time messaging.
+ * Replaces the previous Firebase-based implementation.
+ */
 @Singleton
 class ChatRepository @Inject constructor(
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore,
-    private val storage: FirebaseStorage
+    private val api: AlphaChatApi,
+    private val socketManager: SocketManager,
+    private val tokenManager: TokenManager
 ) {
-    // Use getters to lazily access collections, avoiding immediate crash if dependencies aren't fully ready
-    private val messagesRef get() = firestore.collection("messages")
-    private val usersRef get() = firestore.collection("users")
-    private val conversationsRef get() = firestore.collection("conversations")
-    private val storageRef get() = storage.reference
-
-    private suspend fun getCurrentUserIdEnsuringAuth(): String {
-        var currentUser = auth.currentUser
-        if (currentUser == null) {
-            auth.signInAnonymously().await()
-            currentUser = auth.currentUser!!
-        }
-        return currentUser.uid
-    }
-
-    suspend fun sendMessage(text: String, toId: String) {
-        val fromId = getCurrentUserIdEnsuringAuth()
-        val chatId = if (fromId < toId) "${fromId}_$toId" else "${toId}_$fromId"
-
-        val message = Message(
-            text = text,
-            fromId = fromId,
-            toId = toId,
-            chatId = chatId,
-            timestamp = FieldValue.serverTimestamp()
-        )
-
-        coroutineScope {
-            async { messagesRef.add(message).await() }
-            async { 
-                val conversationUpdate = mapOf(
-                    "lastMessage" to text,
-                    "lastMessageTimestamp" to FieldValue.serverTimestamp(),
-                    "participantIds" to listOf(fromId, toId)
-                )
-                conversationsRef.document(chatId).set(conversationUpdate, SetOptions.merge()).await()
-            }
-        }
-    }
-
-    fun observeMessages(chatId: String): Flow<List<Message>> = callbackFlow {
-        val subscription = messagesRef
-            .whereEqualTo("chatId", chatId)
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snap, ex ->
-                if (ex != null) {
-                    return@addSnapshotListener
-                }
-                val msgs = snap?.documents?.mapNotNull {
-                    it.toObject(Message::class.java)?.copy(id = it.id)
-                } ?: emptyList()
-                trySend(msgs)
-            }
-        awaitClose { subscription.remove() }
-    }
-
-    fun observeUsers(): Flow<List<User>> = callbackFlow {
-        val subscription = usersRef.addSnapshotListener { snap, ex ->
-            if (ex != null) {
-                return@addSnapshotListener
-            }
-            val users = snap?.documents?.mapNotNull {
-                it.toObject(User::class.java)
-            } ?: emptyList()
-            trySend(users)
-        }
-        awaitClose { subscription.remove() }
-    }
-
-    fun observeConversations(): Flow<List<Conversation>> = callbackFlow {
-        val fromId = auth.currentUser?.uid ?: return@callbackFlow
-        val subscription = conversationsRef
-            .whereArrayContains("participantIds", fromId)
-            .orderBy("lastMessageTimestamp", Query.Direction.DESCENDING)
-            .addSnapshotListener { snap, ex ->
-                if (ex != null) {
-                    return@addSnapshotListener
-                }
-                val convos = snap?.documents?.mapNotNull {
-                    val conversation = it.toObject(Conversation::class.java)?.copy(id = it.id)
-                    conversation?.let { convo ->
-                        // You would fetch user details here and attach to the conversation object
-                        // For now, we will do this in the ViewModel
-                    }
-                    conversation
-                } ?: emptyList()
-                trySend(convos)
-            }
-        awaitClose { subscription.remove() }
-    }
-
-    suspend fun createAccount(email: String, password: String) {
-        auth.createUserWithEmailAndPassword(email, password).await()
-        val user = auth.currentUser
-        if (user != null) {
-            val userMap = User(
-                uid = user.uid,
-                email = user.email ?: "",
-                displayName = user.displayName ?: ""
-            )
-            usersRef.document(user.uid).set(userMap, SetOptions.merge()).await()
-        }
-    }
+    private var _currentUser: User? = null
     
-    suspend fun signInWithEmail(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password).await()
-    }
-    
-    suspend fun signInWithCredential(credential: AuthCredential) {
-        val authResult = auth.signInWithCredential(credential).await()
-        val user = authResult.user
-        if (user != null) {
-            // Check if user already exists in Firestore to avoid overwriting existing data if any
-            // Or just update/merge necessary fields
-             val userMap = User(
-                uid = user.uid,
-                email = user.email ?: "",
-                displayName = user.displayName ?: "",
-                imageUrl = user.photoUrl?.toString() ?: ""
-            )
-            usersRef.document(user.uid).set(userMap, SetOptions.merge()).await()
-        }
-    }
+    private val _users = MutableStateFlow<List<User>>(emptyList())
+    private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
+    private val _channels = MutableStateFlow<List<Channel>>(emptyList())
 
-    fun currentUserId(): String? = auth.currentUser?.uid
+    // ═══════════════════════════════════════════════════════════════════════════
+    // AUTHENTICATION
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    fun signOut() {
-        auth.signOut()
-    }
-
-    suspend fun uploadProfileImage(uri: Uri): String {
-        val user = auth.currentUser ?: throw IllegalStateException("User not logged in")
-        val imageRef = storageRef.child("profile_images/${user.uid}/${UUID.randomUUID()}.jpg")
-        imageRef.putFile(uri).await()
-        return imageRef.downloadUrl.await().toString()
-    }
-
-    suspend fun updateUserProfile(name: String, imageUrl: String? = null) {
-        val user = auth.currentUser ?: return
-        
-        val profileUpdatesBuilder = UserProfileChangeRequest.Builder()
-            .setDisplayName(name)
-        
-        if (imageUrl != null) {
-            profileUpdatesBuilder.setPhotoUri(Uri.parse(imageUrl))
-        }
-        
-        user.updateProfile(profileUpdatesBuilder.build()).await()
-
-        val userMap = mutableMapOf<String, Any>("displayName" to name)
-        if (imageUrl != null) {
-            userMap["imageUrl"] = imageUrl
-        }
-        usersRef.document(user.uid).set(userMap, SetOptions.merge()).await()
-    }
-    
-    suspend fun getUser(uid: String): User? {
+    /**
+     * Check if user is authenticated and load user data
+     */
+    suspend fun checkAuth(): User? {
         return try {
-            usersRef.document(uid).get().await().toObject(User::class.java)
+            val response = api.checkAuth()
+            if (response.isAuthenticated && response.user != null) {
+                _currentUser = response.user
+                tokenManager.saveUserId(response.user.id)
+                socketManager.connect(response.user.id)
+                response.user
+            } else {
+                null
+            }
         } catch (e: Exception) {
+            Timber.e(e, "Auth check failed")
             null
+        }
+    }
+
+    /**
+     * Get current user from API
+     */
+    suspend fun getCurrentUser(): User? {
+        return try {
+            val response = api.getCurrentUser()
+            if (response.success && response.user != null) {
+                val userResponse = response.user as? UserResponse
+                _currentUser = userResponse?.user
+                _currentUser
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Get current user failed")
+            null
+        }
+    }
+
+    /**
+     * Handle OAuth callback - save cookies and verify auth
+     */
+    suspend fun handleOAuthCallback(cookies: String): User? {
+        tokenManager.saveSessionCookie(cookies)
+        return checkAuth()
+    }
+
+    /**
+     * Logout - clear session and disconnect socket
+     */
+    suspend fun logout() {
+        try {
+            api.logout()
+        } catch (e: Exception) {
+            Timber.e(e, "Logout API call failed")
+        } finally {
+            socketManager.disconnect()
+            tokenManager.clearSession()
+            _currentUser = null
+            _users.value = emptyList()
+            _conversations.value = emptyList()
+            _channels.value = emptyList()
+        }
+    }
+
+    /**
+     * Get cached current user ID
+     */
+    fun currentUserId(): String? = _currentUser?.id ?: tokenManager.getUserId()
+
+    /**
+     * Get cached current user
+     */
+    fun currentUser(): User? = _currentUser
+
+    /**
+     * Check if user has a session
+     */
+    fun hasSession(): Boolean = tokenManager.hasSession()
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // USERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Get all users as Flow
+     */
+    fun observeUsers(): Flow<List<User>> = _users.asStateFlow()
+
+    /**
+     * Fetch all users from API
+     */
+    suspend fun fetchUsers(): List<User> {
+        return try {
+            val response = api.getAllUsers()
+            if (response.success) {
+                val usersResponse = response.users as? UsersListResponse
+                val users = usersResponse?.users ?: emptyList()
+                _users.value = users
+                users
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Fetch users failed")
+            emptyList()
+        }
+    }
+
+    /**
+     * Search users
+     */
+    suspend fun searchUsers(query: String): List<User> {
+        return try {
+            val response = api.searchUsers(query)
+            if (response.success) {
+                val usersResponse = response.users as? UsersListResponse
+                usersResponse?.users ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Search users failed")
+            emptyList()
+        }
+    }
+
+    /**
+     * Observe online users from Socket.IO
+     */
+    fun observeOnlineUsers(): Flow<List<OnlineUserInfo>> = socketManager.onlineUsers
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DIRECT MESSAGES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Get all conversations as Flow
+     */
+    fun observeConversations(): Flow<List<Conversation>> = _conversations.asStateFlow()
+
+    /**
+     * Fetch all conversations with other user populated
+     */
+    suspend fun fetchConversations(): List<Conversation> {
+        return try {
+            val response = api.getConversations()
+            if (response.success) {
+                val convosResponse = response.conversations as? ConversationsListResponse
+                val conversations = convosResponse?.conversations ?: emptyList()
+                
+                // Populate otherUser for each conversation
+                val currentId = currentUserId()
+                val populatedConvos = conversations.map { convo ->
+                    val other = convo.participants.find { it.id != currentId }
+                    convo.copy(otherUser = other)
+                }
+                
+                _conversations.value = populatedConvos
+                populatedConvos
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Fetch conversations failed")
+            emptyList()
+        }
+    }
+
+    /**
+     * Get conversation with specific user
+     */
+    suspend fun getConversation(recipientId: String, page: Int = 1): ConversationDetail? {
+        return try {
+            val response = api.getConversation(recipientId, page)
+            if (response.success) {
+                response.conversation as? ConversationDetail
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Get conversation failed")
+            null
+        }
+    }
+
+    /**
+     * Send direct message
+     */
+    suspend fun sendDirectMessage(recipientId: String, content: String, messageType: String = "text"): Message? {
+        return try {
+            val request = SendMessageRequest(content, messageType)
+            val response = api.sendDirectMessage(recipientId, request)
+            if (response.success) {
+                val msgResponse = response.messageData as? MessageResponse
+                msgResponse?.message
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Send message failed")
+            null
+        }
+    }
+
+    /**
+     * Observe incoming direct messages from Socket.IO
+     */
+    fun observeIncomingMessages(): Flow<Message> = socketManager.directMessages
+
+    /**
+     * Observe typing indicators
+     */
+    fun observeTyping(): Flow<Map<String, TypingInfo>> = socketManager.typingUsers
+
+    /**
+     * Send typing indicator
+     */
+    fun sendTypingIndicator(recipientId: String, isTyping: Boolean) {
+        socketManager.sendTyping(recipientId = recipientId, isTyping = isTyping)
+    }
+
+    /**
+     * Mark messages as read
+     */
+    fun markMessagesAsRead(conversationId: String, senderId: String) {
+        socketManager.markAsRead(conversationId, senderId)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHANNELS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Get all channels as Flow
+     */
+    fun observeChannels(): Flow<List<Channel>> = _channels.asStateFlow()
+
+    /**
+     * Fetch all channels
+     */
+    suspend fun fetchChannels(): List<Channel> {
+        return try {
+            val response = api.getAllChannels()
+            if (response.success) {
+                val channelsResponse = response.channels as? ChannelsListResponse
+                val channels = channelsResponse?.channels ?: emptyList()
+                _channels.value = channels
+                channels
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Fetch channels failed")
+            emptyList()
+        }
+    }
+
+    /**
+     * Get channel details with messages
+     */
+    suspend fun getChannel(slug: String, page: Int = 1): ChannelDetail? {
+        return try {
+            val response = api.getChannel(slug, page)
+            if (response.success) {
+                response.channel as? ChannelDetail
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Get channel failed")
+            null
+        }
+    }
+
+    /**
+     * Join a channel
+     */
+    suspend fun joinChannel(channelId: String): Boolean {
+        return try {
+            val response = api.joinChannel(channelId)
+            if (response.success) {
+                socketManager.joinChannel(channelId)
+                fetchChannels() // Refresh channel list
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Join channel failed")
+            false
+        }
+    }
+
+    /**
+     * Leave a channel
+     */
+    suspend fun leaveChannel(channelId: String): Boolean {
+        return try {
+            val response = api.leaveChannel(channelId)
+            if (response.success) {
+                socketManager.leaveChannel(channelId)
+                fetchChannels()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Leave channel failed")
+            false
+        }
+    }
+
+    /**
+     * Send message to channel
+     */
+    suspend fun sendChannelMessage(channelId: String, content: String, messageType: String = "text"): ChannelMessage? {
+        return try {
+            val request = SendMessageRequest(content, messageType)
+            val response = api.sendChannelMessage(channelId, request)
+            if (response.success) {
+                val msgResponse = response.messageData as? ChannelMessageResponse
+                msgResponse?.message
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Send channel message failed")
+            null
+        }
+    }
+
+    /**
+     * Observe incoming channel messages from Socket.IO
+     */
+    fun observeChannelMessages(): Flow<ChannelMessage> = socketManager.channelMessages
+
+    /**
+     * Join channel socket room for real-time updates
+     */
+    fun joinChannelRoom(channelId: String) {
+        socketManager.joinChannel(channelId)
+    }
+
+    /**
+     * Leave channel socket room
+     */
+    fun leaveChannelRoom(channelId: String) {
+        socketManager.leaveChannel(channelId)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SOCKET CONNECTION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Get socket connection state
+     */
+    fun observeConnectionState(): Flow<ConnectionState> = socketManager.connectionState
+
+    /**
+     * Check if socket is connected
+     */
+    fun isSocketConnected(): Boolean = socketManager.isConnected()
+
+    /**
+     * Reconnect socket (if user is authenticated)
+     */
+    fun reconnectSocket() {
+        currentUserId()?.let { userId ->
+            socketManager.connect(userId)
         }
     }
 }
