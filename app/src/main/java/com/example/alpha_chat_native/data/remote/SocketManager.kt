@@ -301,7 +301,7 @@ class SocketManager @Inject constructor(
             val obj = array.getJSONObject(i)
             users.add(
                 OnlineUserInfo(
-                    oderId = obj.optString("oderId", ""),
+                    userId = obj.optString("userId", ""),
                     status = obj.optString("status", "online"),
                     joinedAt = obj.optString("joinedAt", "")
                 )
@@ -324,7 +324,7 @@ data class TypingInfo(
 )
 
 data class OnlineUserInfo(
-    val oderId: String,
+    val userId: String,
     val status: String,
     val joinedAt: String
 )
