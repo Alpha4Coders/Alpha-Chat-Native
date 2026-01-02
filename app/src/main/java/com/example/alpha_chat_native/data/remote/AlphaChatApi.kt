@@ -20,7 +20,7 @@ interface AlphaChatApi {
      * Returns user data if session is valid
      */
     @GET("api/auth/me")
-    suspend fun getCurrentUser(): ApiResponse<UserResponse>
+    suspend fun getCurrentUser(): CurrentUserResponse
     
     /**
      * Check authentication status
@@ -162,29 +162,52 @@ interface AlphaChatApi {
 // RESPONSE MODELS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Generic API response wrapper
+ * Used for endpoints that return various data types
+ */
 @JsonClass(generateAdapter = true)
 data class ApiResponse<T>(
     val success: Boolean,
-    val message: String? = null,
-    // The actual data field varies by endpoint
-    @Json(name = "user") val user: T? = null,
-    @Json(name = "users") val users: T? = null,
-    @Json(name = "channels") val channels: T? = null,
-    @Json(name = "channel") val channel: T? = null,
-    @Json(name = "conversations") val conversations: T? = null,
-    @Json(name = "conversation") val conversation: T? = null,
-    @Json(name = "messages") val messages: T? = null,
-    @Json(name = "messageData") val messageData: T? = null
+    val message: String? = null
 )
 
+/**
+ * Generic API response with success flag
+ */
+@JsonClass(generateAdapter = true)
+data class BaseResponse(
+    val success: Boolean,
+    val message: String? = null
+)
+
+/**
+ * Response from /api/auth/me
+ * Returns { success, user: {...} }
+ */
+@JsonClass(generateAdapter = true)
+data class CurrentUserResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val user: User? = null
+)
+
+/**
+ * Response from /api/users
+ * Returns { success, users: [...] }
+ */
+@JsonClass(generateAdapter = true)
+data class UsersListResponse(
+    val success: Boolean,
+    val users: List<User> = emptyList()
+)
+
+/**
+ * Wrapper for backwards compatibility
+ */
 @JsonClass(generateAdapter = true)
 data class UserResponse(
     val user: User
-)
-
-@JsonClass(generateAdapter = true)
-data class UsersListResponse(
-    val users: List<User>
 )
 
 @JsonClass(generateAdapter = true)

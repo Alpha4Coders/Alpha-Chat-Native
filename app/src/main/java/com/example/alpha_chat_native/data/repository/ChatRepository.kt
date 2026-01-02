@@ -58,8 +58,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getCurrentUser()
             if (response.success && response.user != null) {
-                val userResponse = response.user as? UserResponse
-                _currentUser = userResponse?.user
+                _currentUser = response.user
                 _currentUser
             } else {
                 null
