@@ -165,11 +165,21 @@ interface AlphaChatApi {
 /**
  * Generic API response wrapper
  * Used for endpoints that return various data types
+ * Each endpoint uses different fields, so all fields are nullable
  */
 @JsonClass(generateAdapter = true)
 data class ApiResponse<T>(
     val success: Boolean,
-    val message: String? = null
+    val message: String? = null,
+    // Different endpoints return data in different fields
+    @Json(name = "users") val users: List<User>? = null,
+    @Json(name = "channels") val channels: List<Channel>? = null,
+    @Json(name = "channel") val channel: ChannelDetail? = null,
+    @Json(name = "conversations") val conversations: List<Conversation>? = null,
+    @Json(name = "conversation") val conversation: ConversationDetail? = null,
+    @Json(name = "messageData") val messageData: Message? = null,
+    // For channel messages
+    @Json(name = "message") val channelMessageData: ChannelMessage? = null
 )
 
 /**

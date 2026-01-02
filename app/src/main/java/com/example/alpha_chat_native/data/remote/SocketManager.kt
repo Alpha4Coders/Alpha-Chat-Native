@@ -286,7 +286,7 @@ class SocketManager @Inject constructor(
 
     private fun parseUser(json: JSONObject): User {
         return User(
-            id = json.optString("_id", ""),
+            _id = json.optString("_id", ""),
             username = json.optString("username", ""),
             displayName = json.optString("displayName", ""),
             avatar = json.optString("avatar", ""),

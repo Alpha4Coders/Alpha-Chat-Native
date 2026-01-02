@@ -67,9 +67,9 @@ fun ChatScreen(
 
     val otherUser = remember(users, targetUserId) {
         if (targetUserId == null) {
-            User(id="global", displayName = "Global Chat", email = "Everyone")
+            User(_id = "global", displayName = "Global Chat")
         } else {
-            users.find { it.id == targetUserId } ?: User(displayName = "Chat", id = targetUserId)
+            users.find { it.id == targetUserId } ?: User(displayName = "Chat", _id = targetUserId)
         }
     }
 

@@ -209,7 +209,7 @@ fun UserItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = user.email,
+                    text = user.email ?: "",
                     style = MaterialTheme.typography.bodyMedium,
                     color = secondaryTextColor,
                     maxLines = 1,

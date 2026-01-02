@@ -126,8 +126,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getAllUsers()
             if (response.success) {
-                val usersResponse = response.users as? UsersListResponse
-                val users = usersResponse?.users ?: emptyList()
+                val users = response.users ?: emptyList()
                 _users.value = users
                 users
             } else {
@@ -146,8 +145,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.searchUsers(query)
             if (response.success) {
-                val usersResponse = response.users as? UsersListResponse
-                usersResponse?.users ?: emptyList()
+                response.users ?: emptyList()
             } else {
                 emptyList()
             }
@@ -178,8 +176,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getConversations()
             if (response.success) {
-                val convosResponse = response.conversations as? ConversationsListResponse
-                val conversations = convosResponse?.conversations ?: emptyList()
+                val conversations = response.conversations ?: emptyList()
                 
                 // Populate otherUser for each conversation
                 val currentId = currentUserId()
@@ -206,7 +203,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getConversation(recipientId, page)
             if (response.success) {
-                response.conversation as? ConversationDetail
+                response.conversation
             } else {
                 null
             }
@@ -224,8 +221,7 @@ class ChatRepository @Inject constructor(
             val request = SendMessageRequest(content, messageType)
             val response = api.sendDirectMessage(recipientId, request)
             if (response.success) {
-                val msgResponse = response.messageData as? MessageResponse
-                msgResponse?.message
+                response.messageData
             } else {
                 null
             }
@@ -275,8 +271,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getAllChannels()
             if (response.success) {
-                val channelsResponse = response.channels as? ChannelsListResponse
-                val channels = channelsResponse?.channels ?: emptyList()
+                val channels = response.channels ?: emptyList()
                 _channels.value = channels
                 channels
             } else {
@@ -295,7 +290,7 @@ class ChatRepository @Inject constructor(
         return try {
             val response = api.getChannel(slug, page)
             if (response.success) {
-                response.channel as? ChannelDetail
+                response.channel
             } else {
                 null
             }
@@ -351,8 +346,7 @@ class ChatRepository @Inject constructor(
             val request = SendMessageRequest(content, messageType)
             val response = api.sendChannelMessage(channelId, request)
             if (response.success) {
-                val msgResponse = response.messageData as? ChannelMessageResponse
-                msgResponse?.message
+                response.channelMessageData
             } else {
                 null
             }
