@@ -162,6 +162,18 @@ fun GitHubOAuthWebView(
                             super.onPageFinished(view, url)
                             isLoading = false
                             Timber.d("WebView loaded: $url")
+                            
+                            // Check if we landed on the mobile success page
+                            url?.let {
+                                if (it.contains("/mobile/success")) {
+                                    val cookies = CookieManager.getInstance()
+                                        .getCookie("https://alphachat-v2-backend.onrender.com")
+                                    if (cookies != null && cookies.contains("connect.sid")) {
+                                        Timber.d("OAuth success! Cookies: ${cookies.take(50)}...")
+                                        onCookiesCaptured(cookies)
+                                    }
+                                }
+                            }
                         }
 
                         override fun shouldOverrideUrlLoading(
@@ -171,18 +183,11 @@ fun GitHubOAuthWebView(
                             val url = request?.url?.toString() ?: return false
                             Timber.d("WebView navigating to: $url")
 
-                            // Check if we've hit the success callback
-                            if (isCallbackUrl(url)) {
-                                // Extract session cookies
-                                val cookies = CookieManager.getInstance()
-                                    .getCookie("https://alphachat-v2-backend.onrender.com")
-                                
-                                Timber.d("OAuth success! Cookies captured: ${cookies?.take(50)}...")
-                                
-                                if (cookies != null) {
-                                    onCookiesCaptured(cookies)
-                                    return true
-                                }
+                            // Intercept mobile success page redirect
+                            if (url.contains("/mobile/success") || url.contains("/api/auth/mobile/success")) {
+                                // Let it load - we'll capture cookies in onPageFinished
+                                // This ensures the session cookie is fully set
+                                return false
                             }
                             
                             return false

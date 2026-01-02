@@ -86,19 +86,20 @@ class LoginViewModel @Inject constructor(
     }
 
     /**
-     * Get the GitHub OAuth URL
+     * Get the GitHub OAuth URL for mobile
+     * Uses dedicated mobile endpoint that redirects to backend's success page
      */
     fun getOAuthUrl(): String {
-        return "https://alphachat-v2-backend.onrender.com/api/auth/github"
+        return "https://alphachat-v2-backend.onrender.com/api/auth/github/mobile"
     }
 
     /**
      * Check if a URL is the OAuth success callback
+     * Mobile flow redirects to /api/auth/mobile/success on the backend
      */
     fun isOAuthCallback(url: String): Boolean {
-        return url.contains("/chat") || 
-               url.contains("alphachat-v2.vercel.app") ||
-               url.contains("localhost:5173")
+        return url.contains("/mobile/success") || 
+               url.contains("/api/auth/mobile")
     }
 }
 
