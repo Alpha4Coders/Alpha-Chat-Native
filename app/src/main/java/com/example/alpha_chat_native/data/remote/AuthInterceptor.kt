@@ -2,6 +2,7 @@ package com.example.alpha_chat_native.data.remote
 
 import okhttp3.Interceptor
 import okhttp3.Response
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,8 +21,12 @@ class AuthInterceptor @Inject constructor(
         val requestBuilder = originalRequest.newBuilder()
         
         // Add session cookie if available
-        tokenManager.getSessionCookie()?.let { cookie ->
+        val cookie = tokenManager.getSessionCookie()
+        if (cookie != null) {
+            Timber.d("AuthInterceptor: Adding cookie to ${originalRequest.url}")
             requestBuilder.addHeader("Cookie", cookie)
+        } else {
+            Timber.w("AuthInterceptor: No cookie available for ${originalRequest.url}")
         }
         
         // Add common headers

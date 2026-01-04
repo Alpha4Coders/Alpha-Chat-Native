@@ -36,17 +36,21 @@ class ChatRepository @Inject constructor(
      */
     suspend fun checkAuth(): User? {
         return try {
+            Timber.d("checkAuth: Making API call...")
             val response = api.checkAuth()
+            Timber.d("checkAuth: isAuthenticated=${response.isAuthenticated}, user=${response.user?.username}")
             if (response.isAuthenticated && response.user != null) {
                 _currentUser = response.user
+                Timber.d("checkAuth: User ID = ${response.user.id}")
                 tokenManager.saveUserId(response.user.id)
                 socketManager.connect(response.user.id)
                 response.user
             } else {
+                Timber.w("checkAuth: Not authenticated or no user returned")
                 null
             }
         } catch (e: Exception) {
-            Timber.e(e, "Auth check failed")
+            Timber.e(e, "Auth check failed with exception")
             null
         }
     }
@@ -73,7 +77,10 @@ class ChatRepository @Inject constructor(
      * Handle OAuth callback - save cookies and verify auth
      */
     suspend fun handleOAuthCallback(cookies: String): User? {
+        Timber.d("handleOAuthCallback: Saving cookies (length=${cookies.length})")
+        Timber.d("handleOAuthCallback: Cookie preview: ${cookies.take(80)}...")
         tokenManager.saveSessionCookie(cookies)
+        Timber.d("handleOAuthCallback: Cookies saved, calling checkAuth")
         return checkAuth()
     }
 
