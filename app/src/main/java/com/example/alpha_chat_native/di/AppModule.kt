@@ -4,6 +4,7 @@ import com.example.alpha_chat_native.data.remote.AlphaChatApi
 import com.example.alpha_chat_native.data.remote.AuthInterceptor
 import com.example.alpha_chat_native.data.remote.TokenManager
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,6 +26,8 @@ object AppModule {
     @Singleton
     fun provideMoshi(): Moshi {
         return Moshi.Builder()
+            // Add Kotlin reflection adapter as fallback for code-gen adapters
+            .addLast(KotlinJsonAdapterFactory())
             .build()
     }
 
