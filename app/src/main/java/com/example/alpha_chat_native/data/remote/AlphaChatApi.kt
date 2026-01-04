@@ -170,7 +170,7 @@ interface AlphaChatApi {
 @JsonClass(generateAdapter = true)
 data class ApiResponse<T>(
     val success: Boolean,
-    val message: String? = null,
+    @Json(name = "error") val errorMessage: String? = null,
     // Different endpoints return data in different fields
     @Json(name = "users") val users: List<User>? = null,
     @Json(name = "channels") val channels: List<Channel>? = null,
@@ -178,7 +178,7 @@ data class ApiResponse<T>(
     @Json(name = "conversations") val conversations: List<Conversation>? = null,
     @Json(name = "conversation") val conversation: ConversationDetail? = null,
     @Json(name = "messageData") val messageData: Message? = null,
-    // For channel messages
+    // For channel messages - uses "message" field from backend
     @Json(name = "message") val channelMessageData: ChannelMessage? = null
 )
 
