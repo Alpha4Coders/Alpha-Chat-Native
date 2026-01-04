@@ -10,7 +10,7 @@ import com.squareup.moshi.JsonClass
 data class Message(
     @Json(name = "_id") val id: String = "",
     val sender: User? = null,
-    val receiver: User? = null,
+    val receiver: String = "",  // User ID as string
     val conversation: String = "",
     val content: String = "",
     val messageType: String = "text",  // text, code, image, file
@@ -28,7 +28,7 @@ data class Message(
     // Backwards compatibility
     val text: String get() = content
     val fromId: String get() = sender?.id ?: ""
-    val toId: String get() = receiver?.id ?: ""
+    val toId: String get() = receiver
     val chatId: String get() = conversation
     val timestamp: java.util.Date? 
         get() = createdAt?.let { 

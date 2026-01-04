@@ -253,14 +253,14 @@ class SocketManager @Inject constructor(
     // PARSING HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
 
+
     private fun parseDirectMessage(json: JSONObject): Message {
         val senderJson = json.optJSONObject("sender")
-        val receiverJson = json.optJSONObject("receiver")
         
         return Message(
             id = json.optString("_id", ""),
             sender = senderJson?.let { parseUser(it) },
-            receiver = receiverJson?.let { parseUser(it) },
+            receiver = json.optString("receiver", ""),  // Now just a string ID
             conversation = json.optString("conversation", ""),
             content = json.optString("content", ""),
             messageType = json.optString("messageType", "text"),
