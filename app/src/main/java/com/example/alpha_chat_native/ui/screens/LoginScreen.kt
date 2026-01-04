@@ -153,6 +153,9 @@ fun GitHubOAuthWebView(
                     settings.useWideViewPort = true
                     settings.setSupportZoom(false)
                     
+                    // Set custom User Agent for backend detection
+                    settings.userAgentString = "AlphaChatMobile"
+                    
                     // Enable cookies
                     CookieManager.getInstance().setAcceptCookie(true)
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
