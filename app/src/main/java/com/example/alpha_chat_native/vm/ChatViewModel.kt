@@ -89,21 +89,19 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Load messages for a specific chat/conversation
+     * chatId is the recipientId (other user's ID)
      */
     fun loadMessages(chatId: String) {
         _currentChatId.value = chatId
         viewModelScope.launch {
             try {
                 _isLoading.value = true
+                Timber.d("Loading messages for recipientId: $chatId")
                 
-                // Get recipient ID from chatId (format: "userId1_userId2")
-                val parts = chatId.split("_")
-                val recipientId = parts.find { it != currentUserId } ?: parts.firstOrNull()
-                
-                if (recipientId != null) {
-                    val detail = repo.getConversation(recipientId)
-                    _messages.value = detail?.messages ?: emptyList()
-                }
+                // chatId is the recipientId (other user's ID)
+                val detail = repo.getConversation(chatId)
+                Timber.d("Got conversation detail: ${detail?.messages?.size ?: 0} messages")
+                _messages.value = detail?.messages ?: emptyList()
             } catch (e: Exception) {
                 Timber.e(e, "Error loading messages")
                 _error.value = "Failed to load messages"

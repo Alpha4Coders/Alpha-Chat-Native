@@ -80,7 +80,10 @@ fun ChatListScreen(
         ) {
             items(conversations) { conversation ->
                 ConversationItem(conversation = conversation) {
-                    onConversationClick(conversation.id)
+                    // Pass otherUser's ID - the API uses recipientId, not conversation._id
+                    conversation.otherUser?.id?.let { recipientId ->
+                        onConversationClick(recipientId)
+                    }
                 }
             }
         }

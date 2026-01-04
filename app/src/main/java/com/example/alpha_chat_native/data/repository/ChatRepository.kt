@@ -208,14 +208,27 @@ class ChatRepository @Inject constructor(
      */
     suspend fun getConversation(recipientId: String, page: Int = 1): ConversationDetail? {
         return try {
+            Timber.d("getConversation: Calling API for recipientId=$recipientId")
             val response = api.getConversation(recipientId, page)
-            if (response.success) {
-                response.conversation
+            Timber.d("getConversation: Response success=${response.success}")
+            Timber.d("getConversation: Response conversation=${response.conversation != null}")
+            Timber.d("getConversation: Response messages count=${response.messages?.size ?: 0}")
+            
+            if (response.success && response.conversation != null) {
+                // Build ConversationDetail from separate response fields
+                val detail = ConversationDetail(
+                    conversation = response.conversation,
+                    messages = response.messages ?: emptyList(),
+                    pagination = response.pagination
+                )
+                Timber.d("getConversation: Returning ${detail.messages.size} messages")
+                detail
             } else {
+                Timber.w("Get conversation: success=${response.success}, conversation=${response.conversation != null}")
                 null
             }
         } catch (e: Exception) {
-            Timber.e(e, "Get conversation failed")
+            Timber.e(e, "Get conversation failed: ${e.message}")
             null
         }
     }
@@ -296,9 +309,15 @@ class ChatRepository @Inject constructor(
     suspend fun getChannel(slug: String, page: Int = 1): ChannelDetail? {
         return try {
             val response = api.getChannel(slug, page)
-            if (response.success) {
-                response.channel
+            if (response.success && response.channel != null) {
+                // Build ChannelDetail from separate response fields
+                ChannelDetail(
+                    channel = response.channel,
+                    messages = response.messages,
+                    pagination = response.pagination
+                )
             } else {
+                Timber.w("Get channel: success=${response.success}, channel=${response.channel != null}")
                 null
             }
         } catch (e: Exception) {
@@ -353,7 +372,7 @@ class ChatRepository @Inject constructor(
             val request = SendMessageRequest(content, messageType)
             val response = api.sendChannelMessage(channelId, request)
             if (response.success) {
-                response.channelMessageData
+                response.message
             } else {
                 null
             }
