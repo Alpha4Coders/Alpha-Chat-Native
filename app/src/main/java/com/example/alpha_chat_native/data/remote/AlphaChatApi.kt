@@ -92,7 +92,7 @@ interface AlphaChatApi {
         @Path("slug") slug: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50
-    ): ApiResponse<ChannelDetail>
+    ): ChannelDetailResponse
     
     /**
      * Join a channel
@@ -146,7 +146,7 @@ interface AlphaChatApi {
     suspend fun sendChannelMessage(
         @Path("channelId") channelId: String,
         @Body request: SendMessageRequest
-    ): ApiResponse<ChannelMessageResponse>
+    ): ChannelMessageResponse
     
     /**
      * Toggle reaction on message
@@ -176,10 +176,12 @@ data class ApiResponse<T>(
     @Json(name = "channels") val channels: List<Channel>? = null,
     @Json(name = "channel") val channel: ChannelDetail? = null,
     @Json(name = "conversations") val conversations: List<Conversation>? = null,
-    @Json(name = "conversation") val conversation: ConversationDetail? = null,
+    @Json(name = "conversation") val conversation: Conversation? = null,  // Changed from ConversationDetail
+    @Json(name = "messages") val messages: List<Message>? = null,  // Separate messages field
     @Json(name = "messageData") val messageData: Message? = null,
-    // For channel messages - uses "message" field from backend
-    @Json(name = "message") val channelMessageData: ChannelMessage? = null
+    @Json(name = "pagination") val pagination: Pagination? = null,  // Pagination info
+    // For channel messages - uses "channelMessages" to avoid conflict
+    @Json(name = "channelMessages") val channelMessages: List<ChannelMessage>? = null
 )
 
 /**
@@ -237,7 +239,20 @@ data class MessageResponse(
 
 @JsonClass(generateAdapter = true)
 data class ChannelMessageResponse(
-    val message: ChannelMessage
+    val success: Boolean,
+    val message: ChannelMessage? = null
+)
+
+/**
+ * Response from /api/channels/{slug}
+ * Backend returns channel and messages as separate top-level fields
+ */
+@JsonClass(generateAdapter = true)
+data class ChannelDetailResponse(
+    val success: Boolean,
+    val channel: ChannelWithMembers? = null,
+    val messages: List<ChannelMessage> = emptyList(),
+    val pagination: Pagination? = null
 )
 
 @JsonClass(generateAdapter = true)

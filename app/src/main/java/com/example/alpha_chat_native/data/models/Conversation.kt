@@ -6,6 +6,9 @@ import com.squareup.moshi.JsonClass
 /**
  * Conversation model matching AlphaChat-V2 backend schema.
  * Represents a DM thread between two users.
+ * Note: unreadCount is ignored because backend returns different types:
+ *   - Conversation list: returns Int
+ *   - Single conversation: returns Map<String, Int>
  */
 @JsonClass(generateAdapter = true)
 data class Conversation(
@@ -13,7 +16,8 @@ data class Conversation(
     val participants: List<User> = emptyList(),
     val lastMessage: Message? = null,
     val lastActivity: String? = null,
-    val unreadCount: Int = 0,
+    // Ignored in JSON - backend returns inconsistent types
+    @Transient val unreadCount: Int = 0,
     // Populated client-side for UI convenience
     var otherUser: User? = null
 ) {
