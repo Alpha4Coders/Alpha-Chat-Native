@@ -15,8 +15,8 @@ data class Channel(
     val description: String = "",
     val icon: String = "",
     val type: String = "public",  // public, private
-    val members: List<User> = emptyList(),
-    val admins: List<User> = emptyList(),
+    val members: List<String> = emptyList(),  // User IDs as strings
+    val admins: List<String> = emptyList(),  // User IDs as strings
     val messageCount: Int = 0,
     val lastActivity: String? = null,
     val order: Int = 0,

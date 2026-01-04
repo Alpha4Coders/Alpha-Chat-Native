@@ -13,7 +13,7 @@ data class Conversation(
     val participants: List<User> = emptyList(),
     val lastMessage: Message? = null,
     val lastActivity: String? = null,
-    val unreadCount: Map<String, Int> = emptyMap(),
+    val unreadCount: Int = 0,
     // Populated client-side for UI convenience
     var otherUser: User? = null
 ) {
