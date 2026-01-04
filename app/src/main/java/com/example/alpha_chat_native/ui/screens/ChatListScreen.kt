@@ -142,7 +142,7 @@ fun ConversationItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = conversation.lastMessage,
+                    text = conversation.lastMessageText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = secondaryTextColor,
                     maxLines = 1,
@@ -152,10 +152,19 @@ fun ConversationItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            conversation.lastMessageTimestamp?.toDate()?.let {
-                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+            // Show last activity time if available
+            val formattedTime = conversation.lastActivity?.let { timestamp ->
+                try {
+                    val date = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(timestamp)
+                    date?.let { SimpleDateFormat("hh:mm a", Locale.getDefault()).format(it) }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            
+            formattedTime?.let {
                 Text(
-                    text = sdf.format(it),
+                    text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = secondaryTextColor
                 )

@@ -1,22 +1,20 @@
 package com.example.alpha_chat_native.ui.screens
 
+import android.annotation.SuppressLint
+import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,20 +28,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alpha_chat_native.R
 import com.example.alpha_chat_native.ui.viewmodels.LoginState
 import com.example.alpha_chat_native.ui.viewmodels.LoginViewModel
+import timber.log.Timber
 import kotlin.random.Random
 
 // --- Colors from SplashScreen ---
 private val SplashBackground = Color(0xFF012106)
 private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
+private val GitHubBlack = Color(0xFF24292e)
 
 private data class LoginParticle(
     val x: Float,
@@ -56,26 +55,18 @@ private data class LoginParticle(
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    onSignUpClick: () -> Unit,
+    onSignUpClick: () -> Unit = {},  // Not used anymore - GitHub OAuth only
     viewModel: LoginViewModel = hiltViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-
     val loginState by viewModel.loginState.collectAsState()
     val context = LocalContext.current
-    val activity = LocalContext.current as? androidx.activity.ComponentActivity
+    
+    var showWebView by remember { mutableStateOf(false) }
 
     LaunchedEffect(loginState) {
         when (val state = loginState) {
             is LoginState.Success -> {
                 onLoginSuccess()
-                viewModel.resetState()
-            }
-
-            is LoginState.PasswordResetEmailSent -> {
-                Toast.makeText(context, "Password reset email sent to $email", Toast.LENGTH_LONG).show()
                 viewModel.resetState()
             }
             is LoginState.Error -> {
@@ -86,64 +77,140 @@ fun LoginScreen(
         }
     }
 
-    // GitHub Sign-In Logic (Requires Activity Context)
-    val onGithubSignIn: () -> Unit = {
-        if (activity != null) {
-            // Using Fully Qualified Name to avoid import resolution issues with newBuilder
-            val provider = com.google.firebase.auth.OAuthProvider.newBuilder("github.com")
-            val firebaseAuth = com.google.firebase.auth.FirebaseAuth.getInstance()
-            
-            firebaseAuth.startActivityForSignInWithProvider(activity, provider.build())
-                .addOnSuccessListener { result ->
-                     if (result.credential != null) {
-                         viewModel.loginWithCredential(result.credential!!)
-                     }
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(context, "GitHub Login Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-             Toast.makeText(context, "Activity context not found", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicParticleBackground()
 
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        if (showWebView) {
+            // GitHub OAuth WebView
+            GitHubOAuthWebView(
+                oAuthUrl = viewModel.getOAuthUrl(),
+                onCookiesCaptured = { cookies ->
+                    viewModel.handleOAuthCallback(cookies)
+                    showWebView = false
+                },
+                onCancel = { showWebView = false },
+                isCallbackUrl = { url -> viewModel.isOAuthCallback(url) }
+            )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                TerminalLoginWindow(
+                    loginState = loginState,
+                    onGithubSignIn = { showWebView = true }
+                )
+            }
+        }
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun GitHubOAuthWebView(
+    oAuthUrl: String,
+    onCookiesCaptured: (String) -> Unit,
+    onCancel: () -> Unit,
+    isCallbackUrl: (String) -> Boolean
+) {
+    val context = LocalContext.current
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(SplashBackground)
+    ) {
+        // Back button
+        IconButton(
+            onClick = onCancel,
+            modifier = Modifier
+                .padding(16.dp)
+                .align(Alignment.TopStart)
         ) {
-            TerminalLoginWindow(
-                email = email,
-                onEmailChange = { email = it },
-                password = password,
-                onPasswordChange = { password = it },
-                showPassword = showPassword,
-                onToggleShowPassword = { showPassword = !showPassword },
-                loginState = loginState,
-                onLogin = { viewModel.loginUser(email, password) },
-                onForgotPassword = { viewModel.resetPassword(email) },
-                onSignUpClick = onSignUpClick,
-                onGithubSignIn = onGithubSignIn
+            Icon(
+                Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White
             )
         }
+
+        // Loading indicator
+        var isLoading by remember { mutableStateOf(true) }
+        
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = SplashPrimary
+            )
+        }
+
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.setSupportZoom(false)
+                    
+                    // Set custom User Agent for backend detection
+                    settings.userAgentString = "AlphaChatMobile"
+                    
+                    // Enable cookies
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isLoading = false
+                            Timber.d("WebView loaded: $url")
+                            
+                            // Check if we landed on the mobile success page
+                            url?.let {
+                                if (it.contains("/mobile/success")) {
+                                    val cookies = CookieManager.getInstance()
+                                        .getCookie("https://alphachat-v2-backend.onrender.com")
+                                    if (cookies != null && cookies.contains("connect.sid")) {
+                                        Timber.d("OAuth success! Cookies: ${cookies.take(50)}...")
+                                        onCookiesCaptured(cookies)
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val url = request?.url?.toString() ?: return false
+                            Timber.d("WebView navigating to: $url")
+
+                            // Intercept mobile success page redirect
+                            if (url.contains("/mobile/success") || url.contains("/api/auth/mobile/success")) {
+                                // Let it load - we'll capture cookies in onPageFinished
+                                // This ensures the session cookie is fully set
+                                return false
+                            }
+                            
+                            return false
+                        }
+                    }
+
+                    // Load OAuth URL
+                    loadUrl(oAuthUrl)
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 60.dp)  // Leave room for back button
+        )
     }
 }
 
 @Composable
 fun TerminalLoginWindow(
-    email: String,
-    onEmailChange: (String) -> Unit,
-    password: String,
-    onPasswordChange: (String) -> Unit,
-    showPassword: Boolean,
-    onToggleShowPassword: () -> Unit,
     loginState: LoginState,
-    onLogin: () -> Unit,
-    onForgotPassword: () -> Unit,
-    onSignUpClick: () -> Unit,
     onGithubSignIn: () -> Unit
 ) {
     val terminalBg = Brush.linearGradient(
@@ -158,9 +225,6 @@ fun TerminalLoginWindow(
     val textColor = Color.White
     val accentColor = SplashPrimary
     val secondaryAccent = SplashSecondary
-    val inputBg = Color(0xFF000000).copy(alpha = 0.5f)
-    val inputBorder = SplashPrimary.copy(alpha = 0.5f)
-    val inputText = Color.White
 
     Card(
         modifier = Modifier
@@ -203,21 +267,21 @@ fun TerminalLoginWindow(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // ... Header ...
-                     Row(
+                    // Header
+                    Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
+                            imageVector = Icons.Default.Code,
                             contentDescription = null,
                             tint = accentColor,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "AlphaChat Login",
+                            text = "AlphaChat",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -233,119 +297,67 @@ fun TerminalLoginWindow(
                     }
 
                     Text(
-                        text = "$ ssh user@alpha-chat",
+                        text = "$ git auth login --with-github",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         color = SplashPrimary,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    // Email Input
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = onEmailChange,
-                        placeholder = { Text("Email", color = inputText.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = inputText,
-                            unfocusedTextColor = inputText,
-                            focusedContainerColor = inputBg,
-                            unfocusedContainerColor = inputBg,
-                            focusedBorderColor = inputBorder,
-                            unfocusedBorderColor = inputBorder.copy(alpha = 0.5f)
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = inputBorder) }
+                    Text(
+                        text = "Sign in with your GitHub account to continue. Your profile will be synced from GitHub.",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        color = textColor.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(bottom = 32.dp)
                     )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Password Input
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = onPasswordChange,
-                        placeholder = { Text("Password", color = inputText.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = inputText,
-                            unfocusedTextColor = inputText,
-                            focusedContainerColor = inputBg,
-                            unfocusedContainerColor = inputBg,
-                            focusedBorderColor = inputBorder,
-                            unfocusedBorderColor = inputBorder.copy(alpha = 0.5f)
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
-                        visualTransformation = if (!showPassword) PasswordVisualTransformation() else VisualTransformation.None,
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = inputBorder) },
-                        trailingIcon = {
-                            IconButton(onClick = onToggleShowPassword) {
-                                Icon(
-                                    imageVector = if (showPassword) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Toggle password",
-                                    tint = inputText
+                    // GitHub Login Button
+                    Button(
+                        onClick = onGithubSignIn,
+                        colors = ButtonDefaults.buttonColors(containerColor = GitHubBlack),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = loginState !is LoginState.Loading
+                    ) {
+                        if (loginState is LoginState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                // GitHub icon (using text as fallback)
+                                Text(
+                                    text = "󰊤",  // Nerd font GitHub icon
+                                    fontSize = 24.sp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Continue with GitHub",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 16.sp
                                 )
                             }
                         }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                        Text(
-                            text = "Forgot Password?",
-                            color = secondaryAccent,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.clickable(onClick = onForgotPassword)
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Button(
-                        onClick = onLogin,
-                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = loginState !is LoginState.Loading
-                    ) {
-                        if (loginState is LoginState.Loading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black)
-                        } else {
-                            Text("EXECUTE LOGIN", color = Color.Black, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // GitHub Login Button
-                    Button(
-                        onClick = onGithubSignIn,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                        modifier = Modifier.fillMaxWidth(),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-                        enabled = loginState !is LoginState.Loading
-                    ) {
-                         // You would normally use a GitHub Icon here. For now, text.
-                         // If you have an icon resource: Icon(painterResource(id = R.drawable.github), ...)
-                         Text("Login with GitHub", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("New User? ", color = Color.White, fontFamily = FontFamily.Monospace)
-                        Text(
-                            text = "./register.sh",
-                            color = secondaryAccent,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.clickable(onClick = onSignUpClick)
-                        )
-                    }
+                    Text(
+                        text = "By continuing, you agree to sync with AlphaChat servers",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = textColor.copy(alpha = 0.5f)
+                    )
                 }
             }
         }

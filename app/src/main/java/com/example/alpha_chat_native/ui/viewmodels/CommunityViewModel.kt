@@ -5,12 +5,13 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.alpha_chat_native.data.models.Channel
+import com.example.alpha_chat_native.data.models.ChannelMessage
+import com.example.alpha_chat_native.data.repository.ChatRepository
 import com.example.alpha_chat_native.ui.screens.ChatMessage
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.ktx.toObject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.text.SimpleDateFormat
@@ -21,10 +22,13 @@ import javax.inject.Inject
 private val DiscordAccent = Color(0xFF5865F2)
 private val DiscordRed = Color(0xFFED4245)
 
+/**
+ * ViewModel for Community screen.
+ * Now uses ChatRepository which connects to Express backend.
+ */
 @HiltViewModel
 class CommunityViewModel @Inject constructor(
-    private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val repository: ChatRepository
 ) : ViewModel() {
 
     // Channel Name -> List of Messages
@@ -35,110 +39,158 @@ class CommunityViewModel @Inject constructor(
     private val _channelPermissions = mutableStateMapOf<String, Boolean>()
     val channelPermissions: Map<String, Boolean> = _channelPermissions
 
+    // Actual channels from backend
+    private val _channels = MutableStateFlow<List<Channel>>(emptyList())
+    val channels = _channels.asStateFlow()
+
     init {
-        // Initialize default local permissions (can be moved to Firestore later)
+        // Initialize default local permissions (can be fetched from backend later)
         _channelPermissions["announcements"] = false
         _channelPermissions["rules"] = false
         _channelPermissions["general"] = true
         _channelPermissions["web-dev"] = true
         _channelPermissions["android"] = true
+
+        // Fetch channels from backend
+        fetchChannels()
+
+        // Listen for incoming channel messages from Socket.IO
+        viewModelScope.launch {
+            repository.observeChannelMessages().collect { message ->
+                addMessageToChannel(message.channel, message)
+            }
+        }
     }
 
+    /**
+     * Fetch channels from backend
+     */
+    private fun fetchChannels() {
+        viewModelScope.launch {
+            try {
+                val channelList = repository.fetchChannels()
+                _channels.value = channelList
+            } catch (e: Exception) {
+                Timber.e(e, "Error fetching channels")
+            }
+        }
+    }
+
+    /**
+     * Get messages for a channel
+     */
     fun getMessages(channelId: String): SnapshotStateList<ChatMessage> {
-        // If we don't have a list for this channel yet, create it and start listening
+        // If we don't have a list for this channel yet, create it and load messages
         if (!_channelMessages.containsKey(channelId)) {
             val list = SnapshotStateList<ChatMessage>()
             _channelMessages[channelId] = list
-            listenToMessages(channelId, list)
+            loadChannelMessages(channelId, list)
         }
         return _channelMessages[channelId]!!
     }
 
-    private fun listenToMessages(channelId: String, list: SnapshotStateList<ChatMessage>) {
-        firestore.collection("channels")
-            .document(channelId)
-            .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    Timber.e(e, "Listen failed.")
-                    return@addSnapshotListener
-                }
+    /**
+     * Load messages from backend API
+     */
+    private fun loadChannelMessages(channelId: String, list: SnapshotStateList<ChatMessage>) {
+        viewModelScope.launch {
+            try {
+                // Join the channel's socket room for real-time updates
+                repository.joinChannelRoom(channelId)
 
-                if (snapshot != null) {
+                // Fetch messages from API
+                val detail = repository.getChannel(channelId)
+                if (detail != null) {
                     list.clear()
-                    for (doc in snapshot) {
-                        try {
-                            val id = doc.id
-                            val author = doc.getString("author") ?: "Unknown"
-                            val content = doc.getString("content") ?: ""
-                            val timestampLong = doc.getLong("timestamp") ?: 0L
-                            val isCode = doc.getBoolean("isCode") ?: false
-                            val isAdmin = doc.getBoolean("isAdmin") ?: false
-                            val language = doc.getString("language") ?: "text"
-
-                            // Convert timestamp to readable string
-                            val date = Date(timestampLong)
-                            val format = SimpleDateFormat("MMM dd 'at' h:mm a", Locale.getDefault())
-                            val timestampStr = format.format(date)
-                            
-                            // Determine color locally for now based on admin status
-                            val avatarColor = if (isAdmin) DiscordRed else DiscordAccent
-
-                            list.add(
-                                ChatMessage(
-                                    id = id,
-                                    author = author,
-                                    avatarColor = avatarColor,
-                                    timestamp = timestampStr,
-                                    content = content,
-                                    isCode = isCode,
-                                    language = language,
-                                    isAdmin = isAdmin
-                                )
-                            )
-                        } catch (e: Exception) {
-                            Timber.e(e, "Error parsing message")
-                        }
+                    detail.messages.forEach { msg ->
+                        list.add(convertToUIMessage(msg))
                     }
                 }
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading messages for channel: $channelId")
             }
+        }
     }
-    
+
+    /**
+     * Add message from Socket.IO to local list
+     */
+    private fun addMessageToChannel(channelId: String, message: ChannelMessage) {
+        val list = _channelMessages[channelId] ?: return
+        list.add(convertToUIMessage(message))
+    }
+
+    /**
+     * Convert backend ChannelMessage to UI ChatMessage
+     */
+    private fun convertToUIMessage(msg: ChannelMessage): ChatMessage {
+        val sender = msg.sender
+        val authorName = sender?.displayName ?: sender?.username ?: "Unknown"
+        val isAdmin = sender?.role == "cofounder" || sender?.role == "core"
+        
+        val timestampStr = try {
+            msg.createdAt?.let {
+                val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(it)
+                SimpleDateFormat("MMM dd 'at' h:mm a", Locale.getDefault()).format(date ?: Date())
+            } ?: "Now"
+        } catch (e: Exception) {
+            "Now"
+        }
+
+        return ChatMessage(
+            id = msg.id,
+            author = authorName,
+            avatarColor = if (isAdmin) DiscordRed else DiscordAccent,
+            timestamp = timestampStr,
+            content = msg.content,
+            isCode = msg.messageType == "code",
+            language = msg.codeLanguage ?: "text",
+            isAdmin = isAdmin
+        )
+    }
+
+    /**
+     * Get permission for a channel
+     */
     fun getPermission(channel: String): Boolean {
         return _channelPermissions.getOrPut(channel) { true }
     }
 
+    /**
+     * Toggle permission for a channel (admin only)
+     */
     fun togglePermission(channel: String) {
         val current = getPermission(channel)
         _channelPermissions[channel] = !current
-        // In a real app, you'd update this in Firestore:
-        // firestore.collection("channels").document(channel).update("isChatAllowed", !current)
+        // In a real implementation, this would update the backend
     }
 
+    /**
+     * Send a message to a channel
+     */
     fun sendMessage(channelId: String, text: String, isCode: Boolean, isAdmin: Boolean) {
-        val user = auth.currentUser
-        val authorName = if (isAdmin) "Admin" else (user?.displayName ?: "User")
+        if (text.isBlank()) return
         
-        val messageData = hashMapOf(
-            "author" to authorName,
-            "content" to text,
-            "timestamp" to System.currentTimeMillis(),
-            "isCode" to isCode,
-            "isAdmin" to isAdmin,
-            "language" to if (isCode) "text" else "text", // Can be improved with auto-detection
-            "userId" to (user?.uid ?: "")
-        )
-
         viewModelScope.launch {
             try {
-                firestore.collection("channels")
-                    .document(channelId)
-                    .collection("messages")
-                    .add(messageData)
+                val messageType = if (isCode) "code" else "text"
+                val result = repository.sendChannelMessage(channelId, text, messageType)
+                
+                if (result != null) {
+                    // Message will be added via Socket.IO listener
+                    Timber.d("Channel message sent: ${result.id}")
+                }
             } catch (e: Exception) {
-                Timber.e(e, "Error sending message")
+                Timber.e(e, "Error sending channel message")
             }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Leave all channel rooms when ViewModel is cleared
+        _channelMessages.keys.forEach { channelId ->
+            repository.leaveChannelRoom(channelId)
         }
     }
 }

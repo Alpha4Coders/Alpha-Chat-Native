@@ -95,8 +95,18 @@ dependencies {
     // --- Networking ---
     implementation(libs.retrofit)
     implementation(libs.converter.moshi)
+    implementation("com.squareup.moshi:moshi:1.15.0")
+    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
+
+    // --- Socket.IO for real-time messaging ---
+    implementation("io.socket:socket.io-client:2.1.0") {
+        exclude(group = "org.json", module = "json")
+    }
+
+    // --- DataStore for session persistence ---
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // --- MongoDB Realm ---
     implementation("io.realm.kotlin:library-base:2.0.0")
