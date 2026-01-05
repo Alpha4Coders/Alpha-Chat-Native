@@ -120,6 +120,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                        composable<Routes.CommunityScreen> {
+                            CommunityScreen()
+                        }
                     }
                 }
             }

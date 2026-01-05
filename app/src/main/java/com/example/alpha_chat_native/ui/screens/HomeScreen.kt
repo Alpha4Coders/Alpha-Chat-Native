@@ -23,6 +23,10 @@ private val SplashBackground = Color(0xFF012106)
 private val SplashPrimary = Color(0xFF07AD52)
 private val SplashSecondary = Color(0xFF04450F)
 
+// --- AlphaChat Terminal Colors (matching CommunityScreen) ---
+private val AlphaBackground = Color(0xFF0d1117)
+private val AlphaTextPrimary = Color.White
+
 @Composable
 fun HomeScreen(
     onConversationClick: (String) -> Unit,
@@ -48,7 +52,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (selectedIndex == 2) DiscordBackground else Color.Transparent)
+            .background(if (selectedIndex == 2) AlphaBackground else Color.Transparent)
     ) {
         if (selectedIndex != 2) {
              Box(
@@ -64,8 +68,8 @@ fun HomeScreen(
             containerColor = Color.Transparent,
             bottomBar = {
                 NavigationBar(
-                    containerColor = if (selectedIndex == 2) DiscordSidebar else navBarColor,
-                    contentColor = if (selectedIndex == 2) DiscordText else navContentColor
+                    containerColor = if (selectedIndex == 2) AlphaBackground else navBarColor,
+                    contentColor = if (selectedIndex == 2) AlphaTextPrimary else navContentColor
                 ) {
                     NavigationBarItem(
                         icon = { Icon(Icons.Filled.Home, contentDescription = "Chats") },

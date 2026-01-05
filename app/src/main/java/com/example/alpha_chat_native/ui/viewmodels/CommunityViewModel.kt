@@ -114,10 +114,14 @@ class CommunityViewModel @Inject constructor(
 
     /**
      * Add message from Socket.IO to local list
+     * Includes duplicate check to handle case where sender gets their own message echoed back
      */
     private fun addMessageToChannel(channelId: String, message: ChannelMessage) {
         val list = _channelMessages[channelId] ?: return
-        list.add(convertToUIMessage(message))
+        // Only add if not already present (avoid duplicates when socket echoes back sender's message)
+        if (list.none { it.id == message.id }) {
+            list.add(convertToUIMessage(message))
+        }
     }
 
     /**
@@ -167,6 +171,8 @@ class CommunityViewModel @Inject constructor(
 
     /**
      * Send a message to a channel
+     * @param channelId The channel's _id for both API call and local storage key
+     *                  (matches socket listener which uses message.channel = channelId)
      */
     fun sendMessage(channelId: String, text: String, isCode: Boolean, isAdmin: Boolean) {
         if (text.isBlank()) return
@@ -177,8 +183,16 @@ class CommunityViewModel @Inject constructor(
                 val result = repository.sendChannelMessage(channelId, text, messageType)
                 
                 if (result != null) {
-                    // Message will be added via Socket.IO listener
-                    Timber.d("Channel message sent: ${result.id}")
+                    // Add the message locally from API response for immediate display
+                    // Use channelId as key (matches socket listener's message.channel)
+                    val list = _channelMessages[channelId]
+                    if (list != null) {
+                        // Only add if not already present (avoid duplicates)
+                        if (list.none { it.id == result.id }) {
+                            list.add(convertToUIMessage(result))
+                        }
+                    }
+                    Timber.d("Channel message sent and added: ${result.id}")
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error sending channel message")
