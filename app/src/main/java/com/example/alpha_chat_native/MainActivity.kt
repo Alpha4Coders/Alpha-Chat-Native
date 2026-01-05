@@ -40,20 +40,11 @@ class MainActivity : ComponentActivity() {
                                             popUpTo(Routes.SplashScreen) { inclusive = true }
                                         }
                                     } else {
-                                        nav.navigate(Routes.WelcomeScreen) {
+                                        // Go directly to LoginScreen, skip redundant WelcomeScreen
+                                        nav.navigate(Routes.LOGIN) {
                                             popUpTo(Routes.SplashScreen) { inclusive = true }
                                         }
                                     }
-                                }
-                            )
-                        }
-                        composable<Routes.WelcomeScreen> {
-                            WelcomeScreen(
-                                onNavigateToLogin = {
-                                    nav.navigate(Routes.LOGIN)
-                                },
-                                onNavigateToRegister = {
-                                    nav.navigate(Routes.UserRegistrationScreen)
                                 }
                             )
                         }
@@ -61,7 +52,7 @@ class MainActivity : ComponentActivity() {
                             UserRegistrationScreen(
                                 onRegisterSuccess = {
                                     nav.navigate(Routes.HomeScreen) {
-                                        popUpTo(Routes.WelcomeScreen) { inclusive = true }
+                                        popUpTo(Routes.LOGIN) { inclusive = true }
                                     }
                                 },
                                 onNavigateToLogin = {
@@ -128,6 +119,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
+                        }
+                        composable<Routes.CommunityScreen> {
+                            CommunityScreen()
                         }
                     }
                 }

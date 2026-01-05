@@ -22,37 +22,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.alpha_chat_native.data.models.Channel
 import com.example.alpha_chat_native.ui.viewmodels.CommunityViewModel
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
-// Discord Colors
-val DiscordBackground = Color(0xFF36393f)
-val DiscordSidebar = Color(0xFF2f3136)
-val DiscordServerRail = Color(0xFF202225)
-val DiscordText = Color(0xFFdcddde)
-val DiscordAccent = Color(0xFF5865F2)
-val DiscordGreen = Color(0xFF3BA55C)
-val DiscordCodeBackground = Color(0xFF2b2d31)
-val DiscordInput = Color(0xFF40444b)
-val DiscordRed = Color(0xFFED4245)
-val DiscordGold = Color(0xFFFAA61A)
+// ═══════════════════════════════════════════════════════════════════════════
+// ALPHACHAT TERMINAL COLORS (matching web frontend)
+// ═══════════════════════════════════════════════════════════════════════════
+private val AlphaBackground = Color(0xFF0d1117)
+private val AlphaGreen = Color(0xFF39ff14)
+private val AlphaGreenDim = Color(0xFF39ff14).copy(alpha = 0.7f)
+private val AlphaGreenBorder = Color(0xFF39ff14).copy(alpha = 0.2f)
+private val AlphaGreenHover = Color(0xFF39ff14).copy(alpha = 0.1f)
+private val AlphaTextPrimary = Color.White
+private val AlphaTextSecondary = Color(0xFF888888)
+private val AlphaCardBg = Color(0xFF0d1117)
 
-data class Server(val id: Int, val name: String, val initials: String, val isAdmin: Boolean = false)
-data class ChannelCategory(val name: String, val channels: List<String>)
-
+/**
+ * UI model for chat messages (kept for compatibility)
+ */
 data class ChatMessage(
     val id: String,
     val author: String,
@@ -68,195 +65,100 @@ data class ChatMessage(
 fun CommunityScreen(
     viewModel: CommunityViewModel = hiltViewModel()
 ) {
-    // Mock Data
-    val servers = remember {
-        listOf(
-            Server(1, "Alpha Chat", "AC", isAdmin = true),
-            Server(2, "Kotlin Devs", "KD"),
-            Server(3, "Android Worldwide", "AW"),
-            Server(4, "Gaming Lounge", "GL")
-        )
+    val channels by viewModel.channels.collectAsState()
+    var selectedChannel by remember { mutableStateOf<Channel?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Filter channels by search
+    val filteredChannels = channels.filter { 
+        it.name.lowercase().contains(searchQuery.lowercase()) 
     }
 
-    val channels = remember {
-        listOf(
-            ChannelCategory("INFORMATION", listOf("announcements", "rules", "resources")),
-            ChannelCategory("GENERAL", listOf("general", "off-topic", "introductions")),
-            ChannelCategory("DEVELOPMENT", listOf("android", "kotlin", "jetpack-compose", "web-dev"))
-        )
-    }
-
-    var selectedServerId by remember { mutableIntStateOf(1) }
-    var selectedChannel by remember { mutableStateOf<String?>(null) }
-    
-    val currentServer = servers.find { it.id == selectedServerId }
-    val isAdmin = currentServer?.isAdmin == true 
-
-    Box(modifier = Modifier.fillMaxSize().background(DiscordBackground)) {
-        // Navigation View (Server Rail + Channel List)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AlphaBackground)
+    ) {
         if (selectedChannel == null) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                // Server Rail
-                ServerRail(
-                    servers = servers,
-                    selectedServerId = selectedServerId,
-                    onServerSelect = { selectedServerId = it }
-                )
-
-                // Channel List
-                ChannelList(
-                    serverName = servers.find { it.id == selectedServerId }?.name ?: "Server",
-                    categories = channels,
-                    onChannelSelect = { selectedChannel = it }
-                )
-            }
+            // Channel List View
+            ChannelListView(
+                channels = filteredChannels,
+                searchQuery = searchQuery,
+                onSearchChange = { searchQuery = it },
+                onChannelClick = { selectedChannel = it }
+            )
         } else {
-            // Chat View
-            // Retrieve state from ViewModel
-            val messages = viewModel.getMessages(selectedChannel!!)
+            // Channel Chat View - use id as key (matches socket listener)
+            val messages = viewModel.getMessages(selectedChannel!!.id)
             
-            val isChatAllowed = if (isAdmin) {
-                viewModel.getPermission(selectedChannel!!)
-            } else {
-                true 
-            }
-
-            ChatInterface(
-                channelName = selectedChannel!!,
-                isAdmin = isAdmin,
-                areUsersAllowedToChat = isChatAllowed,
+            ChannelChatView(
+                channel = selectedChannel!!,
                 messages = messages,
-                onToggleChatPermission = { 
-                    viewModel.togglePermission(selectedChannel!!)
-                },
                 onBack = { selectedChannel = null },
                 onSendMessage = { text, isCode ->
-                    viewModel.sendMessage(selectedChannel!!, text, isCode, isAdmin)
+                    // Use channel.id for both API call and local storage (matches socket listener)
+                    viewModel.sendMessage(
+                        channelId = selectedChannel!!.id,
+                        text = text,
+                        isCode = isCode,
+                        isAdmin = false
+                    )
                 }
             )
         }
     }
 }
 
-@Composable
-fun ServerRail(
-    servers: List<Server>,
-    selectedServerId: Int,
-    onServerSelect: (Int) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(72.dp)
-            .background(DiscordServerRail)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(servers) { server ->
-            ServerIcon(
-                server = server,
-                isSelected = server.id == selectedServerId,
-                onClick = { onServerSelect(server.id) }
-            )
-        }
-        
-        item {
-             Spacer(modifier = Modifier.height(8.dp))
-             IconButton(
-                 onClick = { /* Add Server */ },
-                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(DiscordSidebar)
-             ) {
-                 Icon(Icons.Default.Add, contentDescription = "Add Server", tint = Color.Green)
-             }
-        }
-    }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// CHANNEL LIST VIEW
+// ═══════════════════════════════════════════════════════════════════════════
 
 @Composable
-fun ServerIcon(server: Server, isSelected: Boolean, onClick: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        // Selection Indicator
-        Box(
-            modifier = Modifier
-                .height(if (isSelected) 40.dp else 8.dp)
-                .width(4.dp)
-                .clip(RoundedCornerShape(0.dp, 4.dp, 4.dp, 0.dp))
-                .background(if (isSelected) Color.White else Color.Transparent)
-        )
-        
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(if (isSelected) RoundedCornerShape(16.dp) else CircleShape)
-                .background(if (isSelected) DiscordAccent else DiscordSidebar)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = server.initials,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun ChannelList(
-    serverName: String, 
-    categories: List<ChannelCategory>,
-    onChannelSelect: (String) -> Unit
+private fun ChannelListView(
+    channels: List<Channel>,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    onChannelClick: (Channel) -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DiscordSidebar)
+            .padding(16.dp)
     ) {
-        // Server Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .padding(horizontal = 16.dp)
-                .background(DiscordSidebar),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = serverName,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-        }
+        // Header
+        AlphaHeader()
         
-        HorizontalDivider(color = DiscordBackground)
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp)
-        ) {
-            categories.forEach { category ->
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = category.name,
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
-                    )
-                }
-                items(category.channels) { channel ->
-                    ChannelItem(
-                        channelName = channel,
-                        onClick = { onChannelSelect(channel) }
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Search Bar
+        AlphaSearchBar(
+            query = searchQuery,
+            onQueryChange = onSearchChange,
+            placeholder = "Search channels..."
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Channel List
+        if (channels.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (searchQuery.isNotEmpty()) "No channels found" else "Loading channels...",
+                    color = AlphaTextSecondary,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(channels) { channel ->
+                    ChannelListItem(
+                        channel = channel,
+                        onClick = { onChannelClick(channel) }
                     )
                 }
             }
@@ -265,593 +167,399 @@ fun ChannelList(
 }
 
 @Composable
-fun ChannelItem(channelName: String, onClick: () -> Unit) {
+private fun AlphaHeader() {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 1.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 8.dp)
     ) {
+        // Terminal icon
         Text(
-            text = "#",
-            color = Color.Gray,
+            text = ">_",
+            color = AlphaGreen,
             fontSize = 20.sp,
-            fontWeight = FontWeight.Light,
-            modifier = Modifier.padding(end = 6.dp)
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        Text(
+            text = "Alpha",
+            color = AlphaTextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
         Text(
-            text = channelName,
-            color = DiscordText,
-            fontSize = 16.sp
+            text = "Chats",
+            color = AlphaGreen,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
     }
 }
 
 @Composable
-fun ChatInterface(
-    channelName: String,
-    isAdmin: Boolean,
-    areUsersAllowedToChat: Boolean,
+private fun AlphaSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .border(1.dp, AlphaGreenBorder, RoundedCornerShape(8.dp))
+            .background(AlphaBackground, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = "Search",
+            tint = AlphaGreenDim,
+            modifier = Modifier.size(20.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            textStyle = TextStyle(
+                color = AlphaTextPrimary,
+                fontSize = 14.sp,
+                fontFamily = FontFamily.Monospace
+            ),
+            cursorBrush = SolidColor(AlphaGreen),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            color = AlphaTextSecondary,
+                            fontSize = 14.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+        
+        if (query.isNotEmpty()) {
+            IconButton(
+                onClick = { onQueryChange("") },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Clear,
+                    contentDescription = "Clear",
+                    tint = AlphaGreenDim,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelListItem(
+    channel: Channel,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Hash symbol
+        Text(
+            text = "#",
+            color = AlphaGreen,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // Channel name
+        Text(
+            text = channel.name,
+            color = AlphaTextPrimary,
+            fontSize = 16.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Member count if available
+        if (channel.memberCount > 0) {
+            Text(
+                text = "${channel.memberCount}",
+                color = AlphaTextSecondary,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                tint = AlphaTextSecondary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHANNEL CHAT VIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ChannelChatView(
+    channel: Channel,
     messages: List<ChatMessage>,
-    onToggleChatPermission: () -> Unit,
     onBack: () -> Unit,
     onSendMessage: (String, Boolean) -> Unit
 ) {
+    var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    var showSettings by remember { mutableStateOf(false) }
 
-    if (showSettings) {
-        ChannelSettingsDialog(
-            channelName = channelName,
-            areUsersAllowedToChat = areUsersAllowedToChat,
-            onToggleChatPermission = onToggleChatPermission,
-            onDismiss = { showSettings = false }
-        )
+    // Scroll to bottom when new messages arrive
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(DiscordBackground)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AlphaBackground)
+    ) {
         // Top Bar
-        ChatTopBar(
-            channelName = channelName, 
-            onBack = onBack, 
-            isAdmin = isAdmin,
-            onSettingsClick = { showSettings = true }
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AlphaBackground)
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(Color.Transparent, AlphaGreenBorder)
+                    ),
+                    shape = RoundedCornerShape(0.dp)
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = AlphaGreen
+                )
+            }
+            
+            Text(
+                text = "#",
+                color = AlphaGreen,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Text(
+                text = channel.name,
+                color = AlphaTextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
 
         // Messages
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.Bottom
-        ) {
-            items(messages) { message ->
-                MessageItem(message)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
-        
-        // Auto-scroll to bottom when messages change
-        LaunchedEffect(messages.size) {
-            if (messages.isNotEmpty()) {
-                listState.animateScrollToItem(messages.size - 1)
-            }
-        }
-
-        // Input
-        if (isAdmin || areUsersAllowedToChat) {
-            ChatInputArea(
-                onSendMessage = { text, isCode ->
-                    onSendMessage(text, isCode)
-                }
-            )
-        } else {
-             // Read Only View for Users
-             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .background(DiscordCodeBackground, RoundedCornerShape(8.dp))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-             ) {
-                 Row(verticalAlignment = Alignment.CenterVertically) {
-                     Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color.Gray)
-                     Spacer(modifier = Modifier.width(8.dp))
-                     Text(
-                         text = "Only admins can send messages in this channel.",
-                         color = Color.Gray,
-                         fontWeight = FontWeight.Bold
-                     )
-                 }
-             }
-        }
-    }
-}
-
-@Composable
-fun ChatTopBar(
-    channelName: String, 
-    onBack: () -> Unit,
-    isAdmin: Boolean,
-    onSettingsClick: () -> Unit
-) {
-    Column {
-        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(DiscordBackground)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
-            Text(
-                text = "#",
-                color = Color.Gray,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Light,
-                modifier = Modifier.padding(start = 8.dp, end = 4.dp)
-            )
-            Text(
-                text = channelName,
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            
-            if (isAdmin) {
-                 IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        Icons.Default.Settings, 
-                        contentDescription = "Channel Settings", 
-                        tint = Color.Gray
-                    )
-                }
-            }
-            
-            IconButton(onClick = { }) {
-                Icon(Icons.Default.People, contentDescription = "Members", tint = Color.Gray)
-            }
-        }
-        HorizontalDivider(color = Color(0xFF26272D), thickness = 1.dp)
-    }
-}
-
-@Composable
-fun ChannelSettingsDialog(
-    channelName: String,
-    areUsersAllowedToChat: Boolean,
-    onToggleChatPermission: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = DiscordBackground
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Settings Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Channel Settings",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .border(1.dp, Color.Gray, CircleShape)
+            if (messages.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillParentMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.padding(4.dp))
-                    }
-                }
-
-                HorizontalDivider(color = DiscordServerRail)
-
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Sidebar
-                    Column(
-                        modifier = Modifier
-                            .width(100.dp)
-                            .fillMaxHeight()
-                            .background(DiscordSidebar)
-                            .padding(top = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "# $channelName",
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF42464D))
-                                .padding(8.dp)
-                        ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = "Overview",
-                                color = Color.White,
-                                fontSize = 14.sp
+                                text = "# ${channel.name}",
+                                color = AlphaGreen,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
                             )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .padding(8.dp)
-                        ) {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Permissions",
-                                color = Color.Gray,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-
-                    // Content
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(24.dp)
-                    ) {
-                        Text(
-                            text = "Overview",
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        // Permission Toggle Section
-                        Text(
-                            text = "CHANNEL PERMISSIONS",
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Send Messages",
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Allow members to send messages in this channel.",
-                                    color = Color.Gray,
-                                    fontSize = 14.sp
-                                )
-                            }
-                            
-                            Switch(
-                                checked = areUsersAllowedToChat,
-                                onCheckedChange = { onToggleChatPermission() },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = DiscordGreen,
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Color.Gray
-                                )
-                            )
-                        }
-                        
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 24.dp), 
-                            color = Color.Gray.copy(alpha = 0.3f)
-                        )
-
-                         Text(
-                            text = "ADVANCED",
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Slow Mode",
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Members will be restricted to sending one message every 5 seconds.",
-                                    color = Color.Gray,
-                                    fontSize = 14.sp
-                                )
-                            }
-                             Switch(
-                                checked = false,
-                                onCheckedChange = { },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = DiscordGreen,
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Color.Gray
-                                )
+                                text = "Welcome! Start the conversation.",
+                                color = AlphaTextSecondary,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun MessageItem(message: ChatMessage) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        // Avatar
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(message.avatarColor),
-            contentAlignment = Alignment.Center
-        ) {
-            // Placeholder for avatar image
-             Text(
-                text = message.author.take(1),
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            // Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = message.author,
-                    color = if(message.author == "You") DiscordAccent else if (message.isAdmin) DiscordRed else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                
-                if (message.isAdmin) {
-                     Icon(
-                        imageVector = Icons.Default.Stars, // Using Stars as a crown proxy
-                        contentDescription = "Admin",
-                        tint = DiscordGold,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-
-                Text(
-                    text = message.timestamp,
-                    color = Color.Gray,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 4.dp).align(Alignment.Bottom)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Content
-            if (message.isCode) {
-                CodeBlock(content = message.content, language = message.language)
             } else {
-                Text(
-                    text = message.content,
-                    color = DiscordText,
-                    fontSize = 16.sp,
-                    lineHeight = 20.sp
-                )
+                items(messages) { message ->
+                    MessageBubble(message = message)
+                }
             }
         }
-    }
-}
 
-@Composable
-fun CodeBlock(content: String, language: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(DiscordCodeBackground)
-            .border(1.dp, Color(0xFF202225), RoundedCornerShape(8.dp))
-    ) {
-        // Code Header
+        // Input Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF202225))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .background(AlphaBackground)
+                .border(1.dp, AlphaGreenBorder, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Mac-style dots
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFF5F57)))
-                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFEBC2E)))
-                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF28C840)))
-            }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Text(
-                text = language.lowercase(),
-                color = DiscordGreen,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { /* Copy logic */ }
-            ) {
-                 Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Copy", color = Color.Gray, fontSize = 12.sp)
-            }
-        }
-        
-        // Code Content
-        Text(
-            text = content,
-            color = DiscordText,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(12.dp)
-        )
-    }
-}
-
-@Composable
-fun ChatInputArea(onSendMessage: (String, Boolean) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    var isCodeMode by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DiscordBackground)
-            .padding(8.dp)
-    ) {
-        // Formatting Toolbar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                .background(DiscordCodeBackground)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = Color.Gray, modifier = Modifier.size(20.dp))
-            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = Color.Gray, modifier = Modifier.size(20.dp))
-            Icon(Icons.Default.StrikethroughS, contentDescription = "Strikethrough", tint = Color.Gray, modifier = Modifier.size(20.dp))
-            Icon(Icons.Default.Link, contentDescription = "Link", tint = Color.Gray, modifier = Modifier.size(20.dp))
-            Icon(Icons.Default.List, contentDescription = "List", tint = Color.Gray, modifier = Modifier.size(20.dp))
-            
-            // Code Toggle
-            Icon(
-                imageVector = Icons.Default.Code, 
-                contentDescription = "Code Block", 
-                tint = if (isCodeMode) DiscordGreen else Color.Gray, 
+            BasicTextField(
+                value = messageText,
+                onValueChange = { messageText = it },
                 modifier = Modifier
-                    .size(20.dp)
-                    .clickable { isCodeMode = !isCodeMode }
+                    .weight(1f)
+                    .background(AlphaGreenHover, RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+                textStyle = TextStyle(
+                    color = AlphaTextPrimary,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace
+                ),
+                cursorBrush = SolidColor(AlphaGreen),
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (messageText.isEmpty()) {
+                            Text(
+                                text = "Message #${channel.name}",
+                                color = AlphaTextSecondary,
+                                fontSize = 14.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
             )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            IconButton(
+                onClick = {
+                    if (messageText.isNotBlank()) {
+                        onSendMessage(messageText, false)
+                        messageText = ""
+                    }
+                },
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        if (messageText.isNotBlank()) AlphaGreen else AlphaGreenBorder,
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (messageText.isNotBlank()) Color.Black else AlphaTextSecondary
+                )
+            }
         }
-        
-        // Input Field
+    }
+}
+
+@Composable
+private fun MessageBubble(message: ChatMessage) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Author and timestamp
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
-                .background(DiscordInput)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Avatar circle
             Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color.Gray),
+                    .background(message.avatarColor),
                 contentAlignment = Alignment.Center
             ) {
-                 Icon(Icons.Default.Add, contentDescription = "Attach", tint = DiscordInput, modifier = Modifier.size(20.dp))
+                Text(
+                    text = message.author.firstOrNull()?.uppercase() ?: "?",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                cursorBrush = SolidColor(Color.White),
-                modifier = Modifier.weight(1f),
-                decorationBox = { innerTextField ->
-                    if (text.isEmpty()) {
-                        Text("Message #channel", color = Color.Gray)
-                    }
-                    innerTextField()
-                }
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Icon(
-                Icons.Default.EmojiEmotions, 
-                contentDescription = "Emoji", 
-                tint = Color.Gray,
-                modifier = Modifier.clickable {}
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Text(
+                text = message.author,
+                color = if (message.isAdmin) AlphaGreen else AlphaTextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
             )
             
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Icon(
-                Icons.AutoMirrored.Filled.Send, 
-                contentDescription = "Send", 
-                tint = if (text.isNotEmpty()) DiscordAccent else Color.Gray,
-                modifier = Modifier.clickable {
-                    if (text.isNotEmpty()) {
-                        onSendMessage(text, isCodeMode)
-                        text = ""
-                        isCodeMode = false
-                    }
-                }
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Text(
+                text = message.timestamp,
+                color = AlphaTextSecondary,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
             )
         }
         
-        if (isCodeMode) {
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        // Message content
+        if (message.isCode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 40.dp)
+                    .background(Color(0xFF1a1a2e), RoundedCornerShape(8.dp))
+                    .border(1.dp, AlphaGreenBorder, RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = message.content,
+                    color = AlphaGreen,
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        } else {
             Text(
-                text = "Code mode enabled - your message will be formatted as code",
-                color = DiscordGreen,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 8.dp, start = 8.dp)
+                text = message.content,
+                color = AlphaTextPrimary,
+                fontSize = 14.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(start = 40.dp)
             )
         }
     }
