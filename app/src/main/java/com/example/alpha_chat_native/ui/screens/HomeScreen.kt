@@ -52,17 +52,14 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (selectedIndex == 2) AlphaBackground else Color.Transparent)
     ) {
-        if (selectedIndex != 2) {
-             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(backgroundBrush)
-            )
-             // Shared Background Animation
-            HomeParticleBackground()
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundBrush)
+        )
+        // Shared Background Animation
+        HomeParticleBackground()
 
         Scaffold(
             containerColor = Color.Transparent,

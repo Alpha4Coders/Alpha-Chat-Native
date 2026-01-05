@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.alpha_chat_native.data.models.Conversation
@@ -57,36 +58,51 @@ fun ChatListScreen(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text("Chats", fontWeight = FontWeight.Bold, color = textColor) },
-                actions = {
-                    IconButton(onClick = {}) { Icon(Icons.Default.Search, contentDescription = "Search", tint = textColor) }
-                    Box {
-                        IconButton(onClick = { showMenu = true }) { 
-                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = textColor) 
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-
-                            modifier = Modifier.background(Color(0xFF1E1E1E))
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Logout", color = Color.White) },
-                                onClick = {
-                                    showMenu = false
-                                    vm.signOut {
-                                        onLogout()
-                                    }
-                                }
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
+            // Custom Compact Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(48.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Chats",
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 20.sp
                 )
-            )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Actions
+                IconButton(onClick = {}, modifier = Modifier.size(40.dp)) { 
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = textColor) 
+                }
+                
+                Box {
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(40.dp)) { 
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = textColor) 
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(Color(0xFF1E1E1E))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Logout", color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                vm.signOut {
+                                    onLogout()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
