@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.util.UUID
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -67,6 +69,7 @@ class ChatRepository @Inject constructor(
                 Timber.d("checkAuth: User ID = ${response.user.id}")
                 tokenManager.saveUserId(response.user.id)
                 socketManager.connect(response.user.id)
+                registerFcmToken()
                 response.user
             } else {
                 Timber.w("checkAuth: Not authenticated or no user returned")
@@ -75,6 +78,23 @@ class ChatRepository @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Auth check failed with exception")
             null
+        }
+    }
+
+    /**
+     * Registers the current Firebase Cloud Messaging token with the backend
+     */
+    private suspend fun registerFcmToken() {
+        try {
+            val token = FirebaseMessaging.getInstance().token.await()
+            val response = api.registerFcmToken(FcmTokenRequest(token))
+            if (response.success) {
+                Timber.d("FCM token registered successfully on login: $token")
+            } else {
+                Timber.w("Backend failed to register FCM token")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to register FCM token on login")
         }
     }
 
