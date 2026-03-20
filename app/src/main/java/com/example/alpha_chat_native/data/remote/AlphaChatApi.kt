@@ -294,3 +294,8 @@ data class ReactionRequest(
     val emoji: String,
     val messageType: String = "dm"  // dm or channel
 )
+
+@JsonClass(generateAdapter = true)
+data class FcmTokenRequest(
+    val token: String
+)
