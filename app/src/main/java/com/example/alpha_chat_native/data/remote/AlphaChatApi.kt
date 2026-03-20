@@ -37,12 +37,17 @@ interface AlphaChatApi {
     // ═══════════════════════════════════════════════════════════════════════════
     // USER ENDPOINTS
     // ═══════════════════════════════════════════════════════════════════════════
-    
     /**
      * Get all users (for DM list)
      */
     @GET("api/users")
     suspend fun getAllUsers(): ApiResponse<UsersListResponse>
+
+    /**
+     * Register FCM Token for push notifications
+     */
+    @POST("api/users/fcm-token")
+    suspend fun registerFcmToken(@Body request: FcmTokenRequest): ApiResponse<Unit>
     
     /**
      * Get online users

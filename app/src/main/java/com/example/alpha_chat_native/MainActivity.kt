@@ -16,8 +16,26 @@ import com.example.alpha_chat_native.Presentation.Navigation.Routes
 import com.example.alpha_chat_native.ui.screens.*
 import timber.log.Timber
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Declare the launcher at the top of your Activity/Fragment:
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Timber.d("FCM Notification Permission Granted")
+        } else {
+            Timber.w("FCM Notification Permission Denied")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -26,6 +44,8 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Timber.e(e, "Failed to enable edge to edge")
         }
+
+        askNotificationPermission()
 
         setContent {
             AlphaChatNativeTheme {
@@ -115,6 +135,29 @@ class MainActivity : ComponentActivity() {
                             CommunityScreen()
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private fun askNotificationPermission() {
+        // This is only necessary for API level >= 33 (TIRAMISU)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // FCM SDK (and your app) can post notifications.
+                    Timber.d("FCM Notification Permission already granted")
+                }
+                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                    // User denied previously, show education UI and then standard dialog if they agree (Skipping education UI for brevity)
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                else -> {
+                    // Directly ask for the permission
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
