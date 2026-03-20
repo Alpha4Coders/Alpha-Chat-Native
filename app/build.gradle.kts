@@ -109,6 +109,11 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
+    // --- WorkManager for offline sync queue ---
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
     // MongoDB Realm removed — was unused, added ~6MB to APK + slow build times
 
     // --- Testing ---
