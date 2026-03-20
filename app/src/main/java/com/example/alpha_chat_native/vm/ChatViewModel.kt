@@ -44,6 +44,10 @@ class ChatViewModel @Inject constructor(
     val channels = repo.observeChannels()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Online users from Socket.IO
+    val onlineUsers = repo.observeOnlineUsers()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 

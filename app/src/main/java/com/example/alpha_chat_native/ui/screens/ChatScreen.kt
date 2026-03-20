@@ -53,11 +53,13 @@ fun ChatScreen(
         vm.loadMessages(chatId)
     }
 
-    val messages by vm.messages.collectAsState(initial = emptyList())
+    val messages by vm.messages.collectAsState()
     val currentUserId = vm.currentUserId
+    val users by vm.users.collectAsState()
+    val conversations by vm.conversations.collectAsState()
+    val onlineUsers by vm.onlineUsers.collectAsState()
     
     // Attempt to find the "other" user to display their name/avatar
-    val users by vm.users.collectAsState()
     
     // chatId is already the recipientId (other user's ID)
     // No need to split - just use it directly
@@ -123,10 +125,14 @@ fun ChatScreen(
                                     color = textColor
                                 )
                                 if (chatId != "global") {
+                                    val isOnline = onlineUsers.any { it.userId == otherUser.id } || otherUser.isOnline
+                                    val statusText = if (isOnline) "Active now" else "Away"
+                                    val statusColor = if (isOnline) AlphaNeonGreen else Color.Gray
+
                                     Text(
-                                        text = "Online", 
+                                        text = statusText, 
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = AlphaNeonGreen
+                                        color = statusColor
                                     )
                                 }
                             }
